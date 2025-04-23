@@ -1,0 +1,68 @@
+#pragma once
+
+#include <assert>
+#include <cmath>
+
+#include <strong_type/strong_type.hpp>
+
+
+namespace mtetcol {
+
+using Scalar = double;
+using Index = uint32_t;
+
+/**
+ * Signed index to represent both orientation and index.
+ */
+using SignedIndex = strong::type<int32_t, struct SignedIndexTag>;
+
+/**
+ * @brief Get the value of a signed index.
+ *
+ * @param signed_index The signed index to get the value from.
+ *
+ * @return The value of the signed index.
+ */
+explicit inline SignedIndex signed_index(Index index, bool orientation)
+{
+    if (orientation) {
+        return SignedIndex(static_cast<int32_t>(index));
+    } else {
+        return SignedIndex(-static_cast<int32_t>(index));
+    }
+}
+
+/**
+ * @brief Get the unsigned index value of a signed index.
+ *
+ * @param signed_index The signed index to get the value from.
+ *
+ * @return The value of the unsigned index.
+ */
+explicit inline Index index(SignedIndex signed_index)
+{
+    const int32_t value = value_of(signed_index);
+    assert(value != 0);
+    if (value >= 0) {
+        return static_cast<Index>(value - 1);
+    } else {
+        return static_cast<Index>(-value - 1);
+    }
+}
+
+/**
+ * @brief Get the orientation of a signed index.
+ *
+ * @param signed_index The signed index to get the orientation from.
+ *
+ * @return True if the signed index is positive, false otherwise.
+ */
+explicit inline bool orientation(SignedIndex signed_index)
+{
+    const int32_t value = value_of(signed_index);
+    assert(value != 0);
+    return value > 0;
+}
+
+} // namespace mtetcol
+

@@ -1,52 +1,102 @@
 #pragma once
 
+#include <algorithm>
 #include <exception>
+#include <iterator>
 #include <span>
 #include <vector>
 
+#include <mtetcol/common.h>
+
 namespace mtetcol {
 
-using Scalar = double;
-using Index = uint32_t;
-
+/**
+ * @brief A class representing a space-time contour composed of vertices, segments, cycles, and
+ * polyhedra.
+ *
+ * @tparam dim The dimension of the ambient space. Default is 4.
+ *
+ * The Contour class provides a data structure for representing and manipulating 4D contours in
+ * space-time. Each vertex has (x,y,t) or (x,y,z,t) coordinates, and these vertices are connected by
+ * oriented segments. Segments can be grouped into cycles (closed loops), and cycles can be grouped
+ * into polyhedra.
+ */
+template <int dim = 4>
 class Contour
 {
 public:
-    void add_vertex(Scalar x, Scalar y, Scalar z, Scalar t)
+    static_assert(dim == 3 || dim == 4, "Ambient dimension of contour must be 3 or 4");
+
+    /**
+     * @brief Adds a new vertex to the contour
+     *
+     * @param vertex A span of coordinates representing the vertex
+     * @throws std::runtime_error if dim is not 4
+     */
+    void add_vertex(std::span<const Scalar, dim> vertex)
     {
-        m_vertices.push_back(x);
-        m_vertices.push_back(y);
-        m_vertices.push_back(z);
-        m_vertices.push_back(t);
-    }
-    std::span<const Scalar, 4> get_vertex(Index vid) const
-    {
-        return std::span<Scalar, 4>(m_vertices.data() + vid * 4, 4);
+        m_vertices.insert(m_vertices.end(), vertex.begin(), vertex.end());
     }
 
+    /**
+     * @brief Retrieves the coordinates of a vertex
+     *
+     * @param vid The index of the vertex to retrieve
+     * @return std::span<const Scalar, 4> A span containing the (x,y,z,t) coordinates of the vertex
+     * @throws std::out_of_range if vid is out of range
+     */
+    std::span<const Scalar, dim> get_vertex(Index vid) const
+    {
+        return std::span<Scalar, dim>(m_vertices.data() + vid * dim, dim);
+    }
+
+    /**
+     * @brief Adds a new segment to the contour
+     *
+     * @param v0 Index of the first vertex
+     * @param v1 Index of the second vertex
+     */
     void add_segment(Index v0, Index v1)
     {
         m_segments.push_back(v0);
         m_segments.push_back(v1);
     }
+    /**
+     * @brief Retrieves the vertex indices of a segment
+     *
+     * @param segid The index of the segment to retrieve
+     * @return std::span<const Index, 2> A span containing the two vertex indices
+     * @throws std::out_of_range if segid is out of range
+     */
     std::span<const Index, 2> get_segment(Index segid) const
     {
         return std::span<Index, 2>(m_segments.data() + segid * 2, 2);
     }
 
-    void add_cycle(std::span<const Index> cycle, std::span<const bool> orientations)
+    /**
+     * @brief Adds a new cycle to the contour
+     *
+     * A cycle is a closed loop of segments. Each segment in the cycle can be oriented
+     * either in its original direction or reversed.
+     *
+     * @param cycle Span of segment signed indices that form the cycle
+     */
+    void add_cycle(std::span<const SignedIndex> cycle)
     {
-        if (cycle.size() != orientations.size()) {
-            throw std::invalid_argument("Cycle and orientations must have the same size");
-        }
-
-        for (size_t i = 0; i < cycle.size(); ++i) {
-            m_cycles.push_back(cycle[i]);
-            m_cycle_segment_orientations.push_back(orientations[i]);
-        }
+        std::copy(cycle.begin(), cycle.end(), std::back_inserter(m_cycles));
         m_cycle_start_indices.push_back(m_cycles.size());
     }
-    std::tuple<std::span<const Index>, std::span<const bool>> get_cycle(Index cid) const
+
+    /**
+     * @brief Retrieves a cycle from the contour
+     *
+     * @param cid The index of the cycle to retrieve
+     *
+     * @return    A span containing an ordered list of signed segment indices of the cycle
+     *
+     * @throws std::out_of_range if cid is out of range
+     */
+    std::span<const SignedIndex> get_cycle(Index cid) const
     {
         if (cid >= m_cycle_start_indices.size() - 1) {
             throw std::out_of_range("Cycle ID out of range");
@@ -55,24 +105,31 @@ public:
         Index start = m_cycle_start_indices[cid];
         Index end = m_cycle_start_indices[cid + 1];
 
-        return {
-            std::span<Index>(m_cycles.data() + start, end - start),
-            std::span<bool>(m_cycle_segment_orientations.data() + start, end - start)};
+        return std::span<SignedIndex>(m_cycles.data() + start, end - start);
     }
 
-    void add_polyhedron(std::span<const Index> polyhedron, std::span<const bool> orientations)
+    /**
+     * @brief Adds a new polyhedron to the contour
+     *
+     * A polyhedron is defined by a collection of oriented cycles that form its faces.
+     *
+     * @param polyhedron Span of cycle indices that form the polyhedron faces
+     */
+    void add_polyhedron(std::span<const SignedIndex> polyhedron)
     {
-        if (polyhedron.size() != orientations.size()) {
-            throw std::invalid_argument("Polyhedron and orientations must have the same size");
-        }
-
-        for (size_t i = 0; i < polyhedron.size(); ++i) {
-            m_polyhedra.push_back(polyhedron[i]);
-            m_polyhedron_cycle_orientations.push_back(orientations[i]);
-        }
+        std::copy(polyhedron.begin(), polyhedron.end(), std::back_inserter(m_polyhedra));
         m_polyhedron_start_indices.push_back(m_polyhedra.size());
     }
-    std::tuple<std::span<const Index>, std::span<const bool>> get_polyhedron(Index poly_id) const
+
+    /**
+     * @brief Retrieves a polyhedron from the contour
+     *
+     * @param poly_id The index of the polyhedron to retrieve
+     * @return A span containing a list of signed cycles of the polyhedron
+     *
+     * @throws std::out_of_range if poly_id is out of range
+     */
+    std::span<const SignedIndex> get_polyhedron(Index poly_id) const
     {
         if (poly_id >= m_polyhedron_start_indices.size() - 1) {
             throw std::out_of_range("Polyhedron ID out of range");
@@ -81,9 +138,7 @@ public:
         Index start = m_polyhedron_start_indices[poly_id];
         Index end = m_polyhedron_start_indices[poly_id + 1];
 
-        return {
-            std::span<Index>(m_polyhedra.data() + start, end - start),
-            std::span<bool>(m_polyhedron_cycle_orientations.data() + start, end - start)};
+        return std::span<SignedIndex>(m_polyhedra.data() + start, end - start);
     }
 
 
@@ -107,18 +162,16 @@ private:
      *
      * Each cycle is a chain of segments that form a closed loop.
      */
-    std::vector<Index> m_cycles;
+    std::vector<SignedIndex> m_cycles;
     std::vector<Index> m_cycle_start_indices = {0};
-    std::vector<bool> m_cycle_segment_orientations;
 
     /**
      * @brief Contour polyhedra.
      *
      * Each polyhedron is a list of oriented cycles that forms the faces of the polyhedron.
      */
-    std::vector<Index> m_polyhedra;
+    std::vector<SignedIndex> m_polyhedra;
     std::vector<Index> m_polyhedron_start_indices = {0};
-    std::vector<bool> m_polyhedron_cycle_orientations;
 };
 
 } // namespace mtetcol
