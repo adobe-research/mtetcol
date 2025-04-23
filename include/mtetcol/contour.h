@@ -51,6 +51,16 @@ public:
     }
 
     /**
+     * @brief Retrieves the number of vertices in the contour
+     *
+     * @return size_t The number of vertices
+     */
+    size_t get_num_vertices() const
+    {
+        return m_vertices.size() / dim;
+    }
+
+    /**
      * @brief Adds a new segment to the contour
      *
      * @param v0 Index of the first vertex
@@ -71,6 +81,16 @@ public:
     std::span<const Index, 2> get_segment(Index segid) const
     {
         return std::span<Index, 2>(m_segments.data() + segid * 2, 2);
+    }
+
+    /**
+     * @brief Retrieves the number of segments in the contour
+     *
+     * @return size_t The number of segments
+     */
+    size_t get_num_segments() const
+    {
+        return m_segments.size() / 2;
     }
 
     /**
@@ -109,6 +129,17 @@ public:
     }
 
     /**
+     * @brief Retrieves the number of cycles in the contour
+     *
+     * @return size_t The number of cycles
+     */
+    size_t get_num_cycles() const
+    {
+        assert(!m_cycle_start_indices.empty());
+        return m_cycle_start_indices.size()  - 1;
+    }
+
+    /**
      * @brief Adds a new polyhedron to the contour
      *
      * A polyhedron is defined by a collection of oriented cycles that form its faces.
@@ -139,6 +170,17 @@ public:
         Index end = m_polyhedron_start_indices[poly_id + 1];
 
         return std::span<SignedIndex>(m_polyhedra.data() + start, end - start);
+    }
+
+    /**
+     * @brief Retrieves the number of polyhedra in the contour
+     *
+     * @return size_t The number of polyhedra
+     */
+    size_t get_num_polyhedra() const
+    {
+        assert(!m_polyhedron_start_indices.empty());
+        return m_polyhedron_start_indices.size() - 1;
     }
 
 
