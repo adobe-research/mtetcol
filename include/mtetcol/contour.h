@@ -14,7 +14,7 @@ namespace mtetcol {
  * @brief A class representing a space-time contour composed of vertices, segments, cycles, and
  * polyhedra.
  *
- * @tparam dim The dimension of the ambient space. Default is 4.
+ * @tparam dim The dimension of the ambient space. Default is 4 (3D space + 1D time).
  *
  * The Contour class provides a data structure for representing and manipulating 4D contours in
  * space-time. Each vertex has (x,y,t) or (x,y,z,t) coordinates, and these vertices are connected by
