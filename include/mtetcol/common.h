@@ -1,6 +1,6 @@
 #pragma once
 
-#include <assert>
+#include <cassert>
 #include <cmath>
 
 #include <strong_type/strong_type.hpp>
@@ -23,7 +23,7 @@ using SignedIndex = strong::type<int32_t, struct SignedIndexTag>;
  *
  * @return The value of the signed index.
  */
-explicit inline SignedIndex signed_index(Index index, bool orientation)
+[[nodiscard]] inline SignedIndex signed_index(Index index, bool orientation)
 {
     if (orientation) {
         return SignedIndex(static_cast<int32_t>(index));
@@ -39,7 +39,7 @@ explicit inline SignedIndex signed_index(Index index, bool orientation)
  *
  * @return The value of the unsigned index.
  */
-explicit inline Index index(SignedIndex signed_index)
+[[nodiscard]] inline Index index(SignedIndex signed_index)
 {
     const int32_t value = value_of(signed_index);
     assert(value != 0);
@@ -57,7 +57,7 @@ explicit inline Index index(SignedIndex signed_index)
  *
  * @return True if the signed index is positive, false otherwise.
  */
-explicit inline bool orientation(SignedIndex signed_index)
+[[nodiscard]] inline bool orientation(SignedIndex signed_index)
 {
     const int32_t value = value_of(signed_index);
     assert(value != 0);
