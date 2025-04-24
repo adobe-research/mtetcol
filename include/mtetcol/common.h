@@ -26,9 +26,9 @@ using SignedIndex = strong::type<int32_t, struct SignedIndexTag>;
 [[nodiscard]] inline SignedIndex signed_index(Index index, bool orientation)
 {
     if (orientation) {
-        return SignedIndex(static_cast<int32_t>(index));
+        return SignedIndex(static_cast<int32_t>(index + 1));
     } else {
-        return SignedIndex(-static_cast<int32_t>(index));
+        return SignedIndex(-static_cast<int32_t>(index + 1));
     }
 }
 

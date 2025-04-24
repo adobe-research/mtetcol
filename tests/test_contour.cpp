@@ -4,11 +4,55 @@
 
 TEST_CASE("contour", "[mtetcol]")
 {
-    SECTION("4D") {
+    SECTION("4D")
+    {
         mtetcol::Contour<4> contour;
         REQUIRE(contour.get_num_vertices() == 0);
         REQUIRE(contour.get_num_segments() == 0);
         REQUIRE(contour.get_num_cycles() == 0);
         REQUIRE(contour.get_num_polyhedra() == 0);
+
+        contour.add_vertex({0, 0, 0, 0});
+        contour.add_vertex({1, 0, 0, 0});
+        contour.add_vertex({0, 1, 0, 0});
+        contour.add_vertex({0, 0, 1, 0});
+
+        REQUIRE(contour.get_num_vertices() == 4);
+        REQUIRE(contour.get_vertex(1)[0] == 1);
+        REQUIRE(contour.get_vertex(0)[3] == 0);
+
+        contour.add_segment(0, 1); // 0
+        contour.add_segment(0, 2); // 1
+        contour.add_segment(0, 3); // 2
+        contour.add_segment(1, 2); // 3
+        contour.add_segment(1, 3); // 4
+        contour.add_segment(2, 3); // 5
+
+        REQUIRE(contour.get_num_segments() == 6);
+
+        contour.add_cycle(
+            {mtetcol::signed_index(1, true),
+             mtetcol::signed_index(3, false),
+             mtetcol::signed_index(0, false)});
+        contour.add_cycle(
+            {mtetcol::signed_index(3, true),
+             mtetcol::signed_index(5, true),
+             mtetcol::signed_index(4, false)});
+        contour.add_cycle(
+            {mtetcol::signed_index(2, true),
+             mtetcol::signed_index(5, false),
+             mtetcol::signed_index(1, false)});
+        contour.add_cycle(
+            {mtetcol::signed_index(0, true),
+             mtetcol::signed_index(4, true),
+             mtetcol::signed_index(2, false)});
+        REQUIRE(contour.get_num_cycles() == 4);
+
+        contour.add_polyhedron(
+            {mtetcol::signed_index(0, true),
+             mtetcol::signed_index(1, true),
+             mtetcol::signed_index(2, true),
+             mtetcol::signed_index(3, true)});
+        REQUIRE(contour.get_num_polyhedra() == 1);
     }
 }

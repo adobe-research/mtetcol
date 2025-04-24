@@ -1,9 +1,12 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <exception>
 #include <iterator>
+#include <numeric>
 #include <span>
+#include <type_traits>
 #include <vector>
 
 #include <mtetcol/common.h>
@@ -31,10 +34,23 @@ public:
      * @brief Adds a new vertex to the contour
      *
      * @param vertex A span of coordinates representing the vertex
-     * @throws std::runtime_error if dim is not 4
      */
     void add_vertex(std::span<const Scalar, dim> vertex)
     {
+        m_vertices.insert(m_vertices.end(), vertex.begin(), vertex.end());
+    }
+
+    /**
+     * @brief Adds a new vertex to the contour
+     *
+     * @param vertex A list of coordinates representing the vertex
+     * @throws std::runtime_error if dim is not dim
+     */
+    void add_vertex(std::initializer_list<Scalar> vertex)
+    {
+        if (vertex.size() != dim) {
+            throw std::runtime_error("Vertex size does not match the dimension of the contour");
+        }
         m_vertices.insert(m_vertices.end(), vertex.begin(), vertex.end());
     }
 
@@ -47,7 +63,7 @@ public:
      */
     std::span<const Scalar, dim> get_vertex(Index vid) const
     {
-        return std::span<Scalar, dim>(m_vertices.data() + vid * dim, dim);
+        return std::span<const Scalar, dim>(m_vertices.data() + vid * dim, dim);
     }
 
     /**
@@ -55,10 +71,7 @@ public:
      *
      * @return size_t The number of vertices
      */
-    size_t get_num_vertices() const
-    {
-        return m_vertices.size() / dim;
-    }
+    size_t get_num_vertices() const { return m_vertices.size() / dim; }
 
     /**
      * @brief Adds a new segment to the contour
@@ -80,7 +93,7 @@ public:
      */
     std::span<const Index, 2> get_segment(Index segid) const
     {
-        return std::span<Index, 2>(m_segments.data() + segid * 2, 2);
+        return std::span<const Index, 2>(m_segments.data() + segid * 2, 2);
     }
 
     /**
@@ -88,10 +101,7 @@ public:
      *
      * @return size_t The number of segments
      */
-    size_t get_num_segments() const
-    {
-        return m_segments.size() / 2;
-    }
+    size_t get_num_segments() const { return m_segments.size() / 2; }
 
     /**
      * @brief Adds a new cycle to the contour
@@ -105,6 +115,22 @@ public:
     {
         std::copy(cycle.begin(), cycle.end(), std::back_inserter(m_cycles));
         m_cycle_start_indices.push_back(m_cycles.size());
+        assert(check_cycle(get_num_cycles() - 1));
+    }
+
+    /**
+     * @brief Adds a new cycle to the contour
+     *
+     * A cycle is a closed loop of segments. Each segment in the cycle can be oriented
+     * either in its original direction or reversed.
+     *
+     * @param cycle Span of segment signed indices that form the cycle
+     */
+    void add_cycle(std::initializer_list<SignedIndex> cycle)
+    {
+        std::copy(cycle.begin(), cycle.end(), std::back_inserter(m_cycles));
+        m_cycle_start_indices.push_back(m_cycles.size());
+        assert(check_cycle(get_num_cycles() - 1));
     }
 
     /**
@@ -125,7 +151,7 @@ public:
         Index start = m_cycle_start_indices[cid];
         Index end = m_cycle_start_indices[cid + 1];
 
-        return std::span<SignedIndex>(m_cycles.data() + start, end - start);
+        return std::span<const SignedIndex>(m_cycles.data() + start, end - start);
     }
 
     /**
@@ -136,7 +162,7 @@ public:
     size_t get_num_cycles() const
     {
         assert(!m_cycle_start_indices.empty());
-        return m_cycle_start_indices.size()  - 1;
+        return m_cycle_start_indices.size() - 1;
     }
 
     /**
@@ -150,6 +176,21 @@ public:
     {
         std::copy(polyhedron.begin(), polyhedron.end(), std::back_inserter(m_polyhedra));
         m_polyhedron_start_indices.push_back(m_polyhedra.size());
+        assert(check_polyhedron(get_num_polyhedra() - 1));
+    }
+
+    /**
+     * @brief Adds a new polyhedron to the contour
+     *
+     * A polyhedron is defined by a collection of oriented cycles that form its faces.
+     *
+     * @param polyhedron Span of cycle indices that form the polyhedron faces
+     */
+    void add_polyhedron(std::initializer_list<SignedIndex> polyhedron)
+    {
+        std::copy(polyhedron.begin(), polyhedron.end(), std::back_inserter(m_polyhedra));
+        m_polyhedron_start_indices.push_back(m_polyhedra.size());
+        assert(check_polyhedron(get_num_polyhedra() - 1));
     }
 
     /**
@@ -169,7 +210,7 @@ public:
         Index start = m_polyhedron_start_indices[poly_id];
         Index end = m_polyhedron_start_indices[poly_id + 1];
 
-        return std::span<SignedIndex>(m_polyhedra.data() + start, end - start);
+        return std::span<const SignedIndex>(m_polyhedra.data() + start, end - start);
     }
 
     /**
@@ -181,6 +222,62 @@ public:
     {
         assert(!m_polyhedron_start_indices.empty());
         return m_polyhedron_start_indices.size() - 1;
+    }
+
+private:
+    /**
+     * @brief Check if the cycle is valid.
+     *
+     * A cycle is valid if each pair of consecutive segments share a vertex.
+     *
+     * @param cid The index of the cycle to check.
+     *
+     * @return True if the cycle is valid, false otherwise.
+     */
+    bool check_cycle(Index cid) const
+    {
+        auto cycle = get_cycle(cid);
+        size_t cycle_size = cycle.size();
+
+        for (size_t i = 0; i < cycle_size; i++) {
+            size_t j = (i + 1) % cycle_size;
+
+            auto seg_i = get_segment(index(cycle[i]));
+            auto seg_j = get_segment(index(cycle[j]));
+
+            auto ori_i = orientation(cycle[i]);
+            auto ori_j = orientation(cycle[j]);
+
+            Index li = ori_i ? 1 : 0;
+            Index lj = ori_j ? 0 : 1;
+
+            if (seg_i[li] != seg_j[lj]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Check if the polyhedron is valid.
+     *
+     * The sum of signed segment indices of all cycles in the polyhedron should be zero.
+     *
+     * @param poly_id The index of the polyhedron to check.
+     *
+     * @return True if the polyhedron is valid, false otherwise.
+     */
+    bool check_polyhedron(Index poly_id) const
+    {
+        int32_t sum = 0;
+        auto poly = get_polyhedron(poly_id);
+        for (auto ci : poly) {
+            auto cycle = get_cycle(index(ci));
+            for (auto si : cycle) {
+                sum += value_of(si);
+            }
+        }
+        return sum == 0;
     }
 
 
