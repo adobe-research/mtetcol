@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <limits>
 
 #include <strong_type/strong_type.hpp>
 
@@ -15,6 +16,9 @@ using Index = uint32_t;
  * Signed index to represent both orientation and index.
  */
 using SignedIndex = strong::type<int32_t, struct SignedIndexTag>;
+
+constexpr Index invalid_index = std::numeric_limits<Index>::max();
+constexpr SignedIndex invalid_signed_index = SignedIndex(0);
 
 /**
  * @brief Get the value of a signed index.
@@ -62,6 +66,11 @@ using SignedIndex = strong::type<int32_t, struct SignedIndexTag>;
     const int32_t value = value_of(signed_index);
     assert(value != 0);
     return value > 0;
+}
+
+[[nodiscard]] inline SignedIndex operator-(SignedIndex signed_index)
+{
+    return SignedIndex(-value_of(signed_index));
 }
 
 } // namespace mtetcol

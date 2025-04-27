@@ -84,6 +84,7 @@ public:
         m_segments.push_back(v0);
         m_segments.push_back(v1);
     }
+
     /**
      * @brief Retrieves the vertex indices of a segment
      *
