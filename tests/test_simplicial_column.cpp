@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <mtetcol/simplicial_column.h>
 
@@ -7,6 +8,76 @@ TEST_CASE("simplicial_column", "[mtetcol]")
     using Index = mtetcol::Index;
     using Scalar = mtetcol::Scalar;
     using SignedIndex = mtetcol::SignedIndex;
+
+    // Sphere of radius 0.5 translating in the x direction by 1 unit.
+    auto sphere_translation = [](Scalar x, Scalar y, Scalar z, Scalar t) -> Scalar {
+        const Scalar radius = 0.5;
+        Scalar center[3] = {t - 0.5, 0, 0};
+        Scalar d = std::sqrt(
+            (x - center[0]) * (x - center[0]) + (y - center[1]) * (y - center[1]) +
+            (z - center[2]) * (z - center[2]));
+        return d - radius;
+    };
+
+    auto sphere_translation_time_derivative = [](Scalar x, Scalar y, Scalar z, Scalar t) -> Scalar {
+        const Scalar radius = 0.5;
+        Scalar center[3] = {t - 0.5, 0, 0};
+        Scalar d = std::sqrt(
+            (x - center[0]) * (x - center[0]) + (y - center[1]) * (y - center[1]) +
+            (z - center[2]) * (z - center[2]));
+        if (d == 0) return 0;
+
+        Scalar spatial_grad[3] = {(x - center[0]) / d, (y - center[1]) / d, (z - center[2]) / d};
+        return -spatial_grad[0];
+    };
+
+    auto check_sphere_translation_time_derivative = [&](Scalar x, Scalar y, Scalar z, Scalar t) {
+        Scalar val = sphere_translation(x, y, z, t);
+        Scalar val_prev = sphere_translation(x, y, z, t - 1e-3);
+        Scalar val_next = sphere_translation(x, y, z, t + 1e-3);
+        Scalar finite_difference =
+            (val_next - val_prev) / (2 * 1e-3);
+        Scalar dfdt = sphere_translation_time_derivative(x, y, z, t);
+        REQUIRE_THAT(dfdt, Catch::Matchers::WithinAbs(finite_difference, 1e-3));
+    };
+
+
+    auto check_translation = [&](mtetcol::SimplicialColumn<4>& columns,
+                                size_t num_time_samples_per_vertex) {
+        auto vertices = columns.get_spatial_vertices();
+        size_t num_vertices = vertices.size() / 3;
+
+        std::vector<Scalar> time_samples;
+        std::vector<Scalar> function_values;
+        std::vector<Index> start_indices;
+        time_samples.reserve(num_time_samples_per_vertex * num_vertices);
+        function_values.reserve(num_time_samples_per_vertex * num_vertices);
+        start_indices.reserve(num_vertices + 1);
+        start_indices.push_back(0);
+
+        for (size_t i = 0; i < num_vertices; i++) {
+            Scalar x = vertices[i * 3];
+            Scalar y = vertices[i * 3 + 1];
+            Scalar z = vertices[i * 3 + 2];
+            for (size_t j=0; j < num_time_samples_per_vertex; j++) {
+                Scalar t = static_cast<Scalar>(j) / (num_time_samples_per_vertex - 1);
+                time_samples.push_back(t);
+                function_values.push_back(sphere_translation_time_derivative(x, y, z, t));
+                check_sphere_translation_time_derivative(x, y, z, t);
+            }
+            start_indices.push_back(
+                static_cast<Index>(time_samples.size()));
+        }
+
+        columns.set_time_samples(
+            std::span<Scalar>(time_samples.data(), time_samples.size()),
+            std::span<Scalar>(function_values.data(), function_values.size()),
+            std::span<Index>(start_indices.data(), start_indices.size()));
+        auto contour = columns.extract_contour(0, false);
+
+        REQUIRE(contour.get_num_vertices() == num_vertices);
+        REQUIRE(contour.get_num_segments() == columns.get_num_spatial_edges());
+    };
 
     SECTION("Single tet")
     {
@@ -30,6 +101,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         REQUIRE(columns.get_num_spatial_edges() == 6);
         REQUIRE(columns.get_num_spatial_triangles() == 4);
         REQUIRE(columns.get_num_spatial_tetrahedra() == 1);
+
+        check_translation(columns, 10);
     }
 
     SECTION("Two tets sharing a face")
@@ -56,6 +129,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         REQUIRE(columns.get_num_spatial_edges() == 9);
         REQUIRE(columns.get_num_spatial_triangles() == 7);
         REQUIRE(columns.get_num_spatial_tetrahedra() == 2);
+
+        check_translation(columns, 10);
     }
 
     SECTION("Two tets sharing an edge")
@@ -83,6 +158,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         REQUIRE(columns.get_num_spatial_edges() == 11);
         REQUIRE(columns.get_num_spatial_triangles() == 8);
         REQUIRE(columns.get_num_spatial_tetrahedra() == 2);
+
+        check_translation(columns, 10);
     }
 
     SECTION("Two tets sharing a vertex")
@@ -111,6 +188,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         REQUIRE(columns.get_num_spatial_edges() == 12);
         REQUIRE(columns.get_num_spatial_triangles() == 8);
         REQUIRE(columns.get_num_spatial_tetrahedra() == 2);
+
+        check_translation(columns, 10);
     }
 
     SECTION("Single triangle")

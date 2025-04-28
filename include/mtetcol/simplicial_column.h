@@ -1,9 +1,9 @@
 #pragma once
 
 #include <cassert>
+#include <functional>
 #include <span>
 #include <vector>
-#include <functional>
 
 #include <mtetcol/common.h>
 #include <mtetcol/contour.h>
@@ -38,6 +38,9 @@ public:
     /**
      * @brief Sets the condensed vertex time samples and function values.
      *
+     * @note Time goes from 0 to 1, and all vertices should contain time samples at 0 and 1.
+     * Time samples for each vertex should be stored in ascending order.
+     *
      * @param time_samples    A span of time samples associated with the vertices.
      * @param function_values A span of function values associated with the vertices.
      * @param vertex_start_indices A span of indices indicating the start of each vertex's time
@@ -55,13 +58,17 @@ public:
         std::span<Scalar> function_values,
         std::span<Index> vertex_start_indices)
     {
-        m_time_samples = time_samples;
-        m_function_values = function_values;
-        m_vertex_start_indices = vertex_start_indices;
+        m_time_samples = std::vector<Scalar>(time_samples.begin(), time_samples.end());
+        m_function_values = std::vector<Scalar>(function_values.begin(), function_values.end());
+        m_vertex_start_indices =
+            std::vector<Index>(vertex_start_indices.begin(), vertex_start_indices.end());
     }
 
     /**
      * @brief Sets the time samples and function values using a function pointer.
+     *
+     * @note Time goes from 0 to 1, and all vertices should contain time samples at 0 and 1.
+     * Time samples for each vertex should be stored in ascending order.
      *
      * @param time_samples    A function pointer to get the time samples associated with the
      *                        vertices. `time_samples(i)` returns a span of time samples for vertex
@@ -108,7 +115,7 @@ public:
      *
      * @return A Contour object representing the extracted isocontour.
      */
-    Contour<dim> extract_contour(Scalar value = 0) const;
+    Contour<dim> extract_contour(Scalar value = 0, bool cyclic = false) const;
 
 public:
     /**
