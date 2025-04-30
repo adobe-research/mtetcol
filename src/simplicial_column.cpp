@@ -219,21 +219,23 @@ void extract_vertex_zero_crossing(
         size_t next_i = (i + 1) % num_samples;
         if (!cyclic && next_i == 0) break;
 
-        const Scalar t_curr = time_samples[i];
-        const Scalar t_next = time_samples[next_i];
-        const Scalar val_curr = function_values[i] - value;
-        const Scalar val_next = function_values[next_i] - value;
-        assert(t_next > t_curr);
-
-        if (std::signbit(val_curr) == std::signbit(val_next)) {
+        if ((function_values[i] < value && function_values[next_i] < value) ||
+            (function_values[i] >= value && function_values[next_i] >= value)) {
             continue;
         } else {
+            const Scalar t_curr = time_samples[i];
+            const Scalar t_next = time_samples[next_i];
+            const Scalar val_curr = function_values[i] - value;
+            const Scalar val_next = function_values[next_i] - value;
+            assert(cyclic || t_next > t_curr);
+            assert(!cyclic || next_i == 0 || t_next > t_curr);
+
             zero_crossing_times.push_back(
                 t_curr + (t_next - t_curr) * (-val_curr) / (val_next - val_curr));
         }
     }
 
-    if (!cyclic && function_values[num_samples - 1] <= value) {
+    if (!cyclic && function_values[num_samples - 1] < value) {
         zero_crossing_times.push_back(time_samples[num_samples - 1]);
     }
 }
@@ -497,8 +499,12 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
         value,
         cyclic);
 
-    auto [contour_segments, contour_segment_indices] =
-        extract_contour_segments(contour_times, contour_time_indices, initial_signs, m_edges, cyclic);
+    auto [contour_segments, contour_segment_indices] = extract_contour_segments(
+        contour_times,
+        contour_time_indices,
+        initial_signs,
+        m_edges,
+        cyclic);
 
     Contour<4> contour;
 
