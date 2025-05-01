@@ -4,6 +4,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <iostream>
 
 namespace mtetcol {
 
@@ -197,6 +198,20 @@ bool check_tetrahedra(const SimplicialColumn<dim>& columns)
     return true;
 }
 
+/**
+ * @brief Extracts the zero-crossing times of a vertex.
+ *
+ * @note Function values that equals to `value` will be treated as have positive sign.
+ *
+ * @note When `cyclic` is false, we will add 0 as a zero-crossing time if the first function value
+ * is non-negative, and add 1 as a zero-crossing time if the last function value is negative.
+ *
+ * @param[in] time_samples The time samples of the vertex.
+ * @param[in] function_values The function values of the vertex.
+ * @param[in] value The value to check for zero-crossing.
+ * @param[in] cyclic Whether the time samples are cyclic.
+ * @param[out] zero_crossing_times The output vector to store the zero-crossing times.
+ */
 void extract_vertex_zero_crossing(
     std::span<const Scalar> time_samples,
     std::span<const Scalar> function_values,
@@ -268,7 +283,7 @@ std::tuple<std::vector<Scalar>, std::vector<size_t>, std::vector<bool>> extract_
             std::span<const Scalar>(time_samples.data() + idx_begein, idx_end - idx_begein);
         std::span<const Scalar> function_values_i =
             std::span<const Scalar>(function_values.data() + idx_begein, idx_end - idx_begein);
-        initial_signs.push_back(function_values_i[0] > value ? true : false);
+        initial_signs.push_back(function_values_i[0] >= value ? true : false);
 
         extract_vertex_zero_crossing(
             time_samples_i,
@@ -360,9 +375,25 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
             if (initial_signs[v0] != initial_signs[v1]) {
                 // Different sign at the beginning
                 offset = 1;
-            }
-            if (initial_signs[v0]) {
-                parity = 1;
+
+                if (local_indices[0].vertex_index == v0) {
+                    // First merged time sample is on v0.
+                    // The offset will shift the samples, and the first time sample available to
+                    // match on v0 will be the second one, which have the opposite initial sign.
+                    if (!initial_signs[v0]) {
+                        parity = 1;
+                    }
+                } else {
+                    // First merged time sample is on v1.
+                    // Shifting does not change the initial sign of v0's first sample.
+                    if (initial_signs[v0]) {
+                        parity = 1;
+                    }
+                }
+            } else {
+                if (initial_signs[v0]) {
+                    parity = 1;
+                }
             }
         }
 
@@ -373,7 +404,7 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
 
             // Pair local indices up based on even/odd parity.
             if ((lid0.vertex_index == v0 && lid0.time_index % 2 == parity) ||
-                (lid1.vertex_index == v1 && lid1.time_index % 2 != parity)) {
+                (lid0.vertex_index == v1 && lid0.time_index % 2 != parity)) {
                 // lid0 -> lid1
                 segments.push_back(contour_time_indices[lid0.vertex_index] + lid0.time_index);
                 segments.push_back(contour_time_indices[lid1.vertex_index] + lid1.time_index);
@@ -387,6 +418,155 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
     }
 
     return {std::move(segments), std::move(segment_indices)};
+}
+
+std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> extract_contour_cycles(
+    const size_t num_contour_vertices,
+    const std::vector<Index>& contour_segments,
+    const std::vector<Index>& contour_segment_indices,
+    const std::vector<Index>& edges,
+    const std::vector<SignedIndex>& triangles)
+{
+    // Map from contour vertex index to contour segement index.
+    std::vector<Index> next_index(num_contour_vertices, invalid_index);
+    std::vector<SignedIndex> contour_cycles;
+    std::vector<Index> contour_cycle_indices;
+    std::vector<Index> contour_cycle_triangle_indices;
+
+    contour_cycle_indices.push_back(0);
+    contour_cycle_triangle_indices.push_back(0);
+
+    assert(contour_segments.size() % 2 == 0);
+    const size_t num_segments = contour_segments.size() / 2;
+
+    auto clear_next_index = [&](Index eid) {
+        assert(eid >= 0 && eid + 1 < contour_segment_indices.size());
+        Index start = contour_segment_indices[eid];
+        Index end = contour_segment_indices[eid + 1];
+        assert((end - start) % 2 == 0);
+        for (Index i = start; i < end; i++) {
+            next_index[contour_segments[i]] = invalid_index;
+        }
+    };
+
+    auto print_edge = [&](Index eid, bool ori) {
+        Index v0 = edges[eid * 2];
+        Index v1 = edges[eid * 2 + 1];
+        if (!ori) {
+            std::swap(v0, v1);
+        }
+        std::cout << "edge: (" << v0 << ", " << v1 << ")" << std::endl;
+    };
+
+    auto print_segment = [&](Index eid, bool ori) {
+        Index start = contour_segment_indices[eid];
+        Index end = contour_segment_indices[eid + 1];
+
+        Index num_segments_over_edge = (end - start) / 2;
+        for (size_t si = 0; si < num_segments_over_edge; si++) {
+            Index v0 = contour_segments[start + si * 2];
+            Index v1 = contour_segments[start + si * 2 + 1];
+            if (!ori) std::swap(v0, v1);
+
+            std::cout << "segment: (" << v0 << ", " << v1 << ")" << std::endl;
+        }
+    };
+
+    auto register_next_index = [&](Index eid, bool ori) {
+        std::cout << "eid: " << eid << ", ori: " << ori << std::endl;
+        assert(eid >= 0 && eid + 1 < contour_segment_indices.size());
+        Index start = contour_segment_indices[eid];
+        Index end = contour_segment_indices[eid + 1];
+        assert((end - start) % 2 == 0);
+        Index num_segments_over_edge = (end - start) / 2;
+        for (size_t si = 0; si < num_segments_over_edge; si++) {
+            Index v0 = contour_segments[start + si * 2];
+            Index v1 = contour_segments[start + si * 2 + 1];
+            if (!ori) std::swap(v0, v1);
+            assert(v0 < num_contour_vertices);
+            assert(next_index[v0] == invalid_index);
+            next_index[v0] = start / 2 + si;
+            std::cout << "Registering next index: (" << v0 << ", " << v1 << ") -> "
+                      << next_index[v0] << std::endl;
+        }
+    };
+
+    auto grow_cycle = [&](Index vid) {
+        assert(next_index[vid] != invalid_index);
+        Index sid = next_index[vid];
+        next_index[vid] = invalid_index;
+
+        Index v0 = contour_segments[sid * 2];
+        Index v1 = contour_segments[sid * 2 + 1];
+
+        if (vid == v0) {
+            contour_cycles.push_back(signed_index(sid, true));
+            return v1;
+        } else {
+            contour_cycles.push_back(signed_index(sid, false));
+            return v0;
+        }
+    };
+
+    auto chain_cycles = [&](Index eid, bool ori) {
+        assert(eid >= 0 && eid + 1 < contour_segment_indices.size());
+        Index start = contour_segment_indices[eid];
+        Index end = contour_segment_indices[eid + 1];
+        assert((end - start) % 2 == 0);
+        Index num_segments_over_edge = (end - start) / 2;
+
+        for (size_t si = 0; si < num_segments_over_edge; si++) {
+            Index v0 = contour_segments[start + si * 2];
+            Index v1 = contour_segments[start + si * 2 + 1];
+            if (!ori) std::swap(v0, v1);
+            if (next_index[v0] == invalid_index) continue;
+
+            while (next_index[v0] != invalid_index) {
+                v0 = grow_cycle(v0);
+            }
+            contour_cycle_indices.push_back(static_cast<Index>(contour_cycles.size()));
+        }
+    };
+
+    assert(triangles.size() % 3 == 0);
+    const size_t num_triangles = triangles.size() / 3;
+    for (size_t ti = 0; ti < num_triangles; ti++) {
+        std::cout << "Triangle " << ti << ": " << std::endl;
+        SignedIndex e01 = triangles[ti * 3];
+        SignedIndex e12 = triangles[ti * 3 + 1];
+        SignedIndex e20 = triangles[ti * 3 + 2];
+
+        Index e01_id = index(e01);
+        Index e12_id = index(e12);
+        Index e20_id = index(e20);
+
+        bool e01_ori = orientation(e01);
+        bool e12_ori = orientation(e12);
+        bool e20_ori = orientation(e20);
+
+        clear_next_index(e01_id);
+        clear_next_index(e12_id);
+        clear_next_index(e20_id);
+
+        print_edge(e01_id, e01_ori);
+        print_segment(e01_id, e01_ori);
+        print_edge(e12_id, e12_ori);
+        print_segment(e12_id, e12_ori);
+        print_edge(e20_id, e20_ori);
+        print_segment(e20_id, e20_ori);
+
+        register_next_index(e01_id, e01_ori);
+        register_next_index(e12_id, e12_ori);
+        register_next_index(e20_id, e20_ori);
+
+        chain_cycles(e01_id, e01_ori);
+        chain_cycles(e12_id, e12_ori);
+        chain_cycles(e20_id, e20_ori);
+
+        contour_cycle_triangle_indices.push_back(contour_cycle_indices.size());
+    }
+
+    return {contour_cycles, contour_cycle_indices, contour_cycle_triangle_indices};
 }
 
 } // namespace
@@ -505,6 +685,14 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
         initial_signs,
         m_edges,
         cyclic);
+
+    auto [contour_cycles, contour_cycle_indices, contour_cycle_triangle_indices] =
+        extract_contour_cycles(
+            contour_times.size(),
+            contour_segments,
+            contour_segment_indices,
+            m_edges,
+            m_triangles);
 
     Contour<4> contour;
 

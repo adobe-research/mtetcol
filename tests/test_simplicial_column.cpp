@@ -49,7 +49,7 @@ TEST_CASE("simplicial_column", "[mtetcol]")
     };
 
     auto sphere_rotation = [](Scalar x, Scalar y, Scalar z, Scalar t) -> Scalar {
-        constexpr Scalar offset = 0.0;
+        constexpr Scalar offset = 0.1;
         const Scalar radius = 0.5;
         const Scalar theta = t * 2 * M_PI;
         Scalar center[3] = {cos(theta) + offset, sin(theta) + offset, offset};
@@ -60,7 +60,7 @@ TEST_CASE("simplicial_column", "[mtetcol]")
     };
 
     auto sphere_rotation_time_derivative = [](Scalar x, Scalar y, Scalar z, Scalar t) -> Scalar {
-        constexpr Scalar offset = 0.0;
+        constexpr Scalar offset = 0.1;
         const Scalar radius = 0.5;
         const Scalar theta = t * 2 * M_PI;
         Scalar center[3] = {cos(theta) + offset, sin(theta) + offset, offset};
@@ -111,7 +111,6 @@ TEST_CASE("simplicial_column", "[mtetcol]")
             std::span<Scalar>(function_values.data(), function_values.size()),
             std::span<Index>(start_indices.data(), start_indices.size()));
     };
-
 
     auto check_translation = [&](mtetcol::SimplicialColumn<4>& columns,
                                 size_t num_time_samples_per_vertex) {
