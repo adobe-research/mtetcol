@@ -253,6 +253,7 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         REQUIRE(columns.get_num_spatial_tetrahedra() == 2);
 
         check_translation(columns, 10);
+        check_rotation(columns, 10);
     }
 
     SECTION("Two tets sharing an edge")
@@ -282,6 +283,7 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         REQUIRE(columns.get_num_spatial_tetrahedra() == 2);
 
         check_translation(columns, 10);
+        check_rotation(columns, 10);
     }
 
     SECTION("Two tets sharing a vertex")
@@ -312,6 +314,7 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         REQUIRE(columns.get_num_spatial_tetrahedra() == 2);
 
         check_translation(columns, 10);
+        check_rotation(columns, 10);
     }
 
     SECTION("Single triangle")
