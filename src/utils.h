@@ -10,6 +10,15 @@
 
 namespace mtetcol {
 
+/**
+ * @brief Checks if the spatial edges of a simplicial column are valid.
+ *
+ * The spatial edges are valid if their end vertices are in ascending order and
+ * the vertex indices are within the range of the number of spatial vertices.
+ *
+ * @param columns The simplicial column to check.
+ * @return True if the edges are valid, false otherwise.
+ */
 template <int dim>
 bool check_edges(const SimplicialColumn<dim>& columns)
 {
@@ -27,6 +36,14 @@ bool check_edges(const SimplicialColumn<dim>& columns)
     return true;
 }
 
+/**
+ * @brief Checks if the spatial triangles of a simplicial column are valid.
+ *
+ * The spatial triangles are valid if the oriented edges of each triangle forms a closed loop.
+ *
+ * @param columns The simplicial column to check.
+ * @return True if the triangles are valid, false otherwise.
+ */
 template <int dim>
 bool check_triangles(const SimplicialColumn<dim>& columns)
 {
@@ -60,6 +77,14 @@ bool check_triangles(const SimplicialColumn<dim>& columns)
     return true;
 }
 
+/**
+ * @brief Checks if the spatial tetrahedra of a simplicial column are valid.
+ *
+ * The spatial tetrahedra are valid if all edges within the tet are consistently oriented.
+ *
+ * @param columns The simplicial column to check.
+ * @return True if the tetrahedra are valid, false otherwise.
+ */
 template <int dim>
 bool check_tetrahedra(const SimplicialColumn<dim>& columns)
 {
@@ -120,6 +145,20 @@ void extract_vertex_zero_crossing(
     bool cyclic,
     std::vector<Scalar>& zero_crossing_times);
 
+/**
+ * @brief Extracts the iso-contour vertices of all spatial vertices.
+ *
+ * @param[in] time_samples The time samples of the vertices.
+ * @param[in] function_values The function values of the vertices.
+ * @param[in] vertex_start_indices The start indices of the vertices.
+ * @param[in] value The target isovalue to check for zero-crossing.
+ * @param[in] cyclic Whether the time samples are cyclic.
+ *
+ * @return A tuple containing:
+ * - A vector of zero-crossing times.
+ * - Indices separating the zero-crossing times of each spatial vertex.
+ * - A vector of initial function signs for each spatial vertex.
+ */
 std::tuple<std::vector<Scalar>, std::vector<size_t>, std::vector<bool>> extract_contour_vertices(
     const std::vector<Scalar>& time_samples,
     const std::vector<Scalar>& function_values,
@@ -127,6 +166,19 @@ std::tuple<std::vector<Scalar>, std::vector<size_t>, std::vector<bool>> extract_
     Scalar value,
     bool cyclic);
 
+/**
+ * @brief Extracts the contour segments from the contour vertices.
+ *
+ * @param contour_times The zero-crossing times of the vertices.
+ * @param contour_time_indices Indices separating the zero-crossing times of each spatial vertex.
+ * @param initial_signs The initial function signs for each spatial vertex.
+ * @param edges The spatial edges of the simplicial column.
+ * @param cyclic Whether the time samples are cyclic.
+ *
+ * @return A tuple containing:
+ * - A vector of contour segments. (Each segment is represented by two consecutive indices.)
+ * - A vector of indices separating the contour segments of each spatial edge.
+ */
 std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
     const std::vector<Scalar>& contour_times,
     const std::vector<size_t>& contour_time_indices,
@@ -134,6 +186,20 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
     const std::vector<Index>& edges,
     bool cyclic);
 
+/**
+ * @brief Extracts the contour cycles from the contour segments.
+ *
+ * @param num_contour_vertices The number of contour vertices.
+ * @param contour_segments The contour segments.
+ * @param contour_segment_indices Indices separating the contour segments of each spatial edge.
+ * @param edges The spatial edges of the simplicial column.
+ * @param triangles The spatial triangles of the simplicial column.
+ *
+ * @return A tuple containing:
+ * - A vector of signed indices of contour segments representing the contour cycles.
+ * - A vector of indices separating the individual cycles.
+ * - A vector of indices separating the contour cycles of each spatial triangle.
+ */
 std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> extract_contour_cycles(
     const size_t num_contour_vertices,
     const std::vector<Index>& contour_segments,
