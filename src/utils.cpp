@@ -2,6 +2,8 @@
 
 #include <mtetcol/logger.h>
 
+#include <SmallVector.h>
+
 #include <functional>
 #include <stdexcept>
 #include <array>
@@ -142,7 +144,7 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
                                  Index v1,
                                  std::span<const Scalar> times_0,
                                  std::span<const Scalar> times_1,
-                                 std::vector<LocalIndex>& local_indices) {
+                                 auto& local_indices) {
         size_t num_times_0 = times_0.size();
         size_t num_times_1 = times_1.size();
         assert((num_times_0 + num_times_1) % 2 == 0);
@@ -171,7 +173,7 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
     };
 
 
-    std::vector<LocalIndex> local_indices; // TODO: this dynamic allocation can be avoided.
+    llvm_vecsmall::SmallVector<LocalIndex, 1024> local_indices;
     for (size_t ei = 0; ei < num_edges; ei++) {
         Index v0 = edges[ei * 2];
         Index v1 = edges[ei * 2 + 1];

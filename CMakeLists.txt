@@ -8,6 +8,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 include(strong_type)
 include(unordered_dense)
 include(spdlog)
+include(smallvector)
 
 file(GLOB INC_FILES ${CMAKE_CURRENT_LIST_DIR}/include/mtetcol/*.h)
 file(GLOB SRC_FILES ${CMAKE_CURRENT_LIST_DIR}/src/*.cpp)
@@ -20,6 +21,7 @@ target_link_libraries(mtetcol
     PRIVATE
     unordered_dense::unordered_dense
     spdlog::spdlog
+    smallvector::smallvector
 )
 
 add_library(mtetcol::mtetcol ALIAS mtetcol)
