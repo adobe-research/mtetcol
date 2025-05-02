@@ -1,7 +1,7 @@
 #include <mtetcol/simplicial_column.h>
 
-#include "logger.h"
 #include "hashmap.h"
+#include "logger.h"
 #include "utils.h"
 
 #include <spdlog/spdlog.h>
@@ -150,6 +150,13 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
     size_t num_segments = contour_segments.size() / 2;
     for (size_t i = 0; i < num_segments; i++) {
         contour.add_segment(contour_segments[i * 2], contour_segments[i * 2 + 1]);
+    }
+
+    size_t num_cycles = contour_cycle_indices.size() - 1;
+    for (size_t i = 0; i < num_cycles; i++) {
+        contour.add_cycle(std::span<SignedIndex>(
+            contour_cycles.data() + contour_cycle_indices[i],
+            contour_cycle_indices[i + 1] - contour_cycle_indices[i]));
     }
 
     return contour;
