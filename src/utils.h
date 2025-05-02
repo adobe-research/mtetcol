@@ -1,0 +1,144 @@
+#pragma once
+
+#include <mtetcol/common.h>
+#include <mtetcol/simplicial_column.h>
+
+#include "logger.h"
+
+#include <span>
+#include <vector>
+
+namespace mtetcol {
+
+template <int dim>
+bool check_edges(const SimplicialColumn<dim>& columns)
+{
+    const size_t num_vertices = columns.get_num_spatial_vertices();
+    const size_t num_edges = columns.get_num_spatial_edges();
+
+    auto edges = columns.get_spatial_edges();
+    for (size_t i = 0; i < num_edges; i++) {
+        Index v0 = edges[i * 2];
+        Index v1 = edges[i * 2 + 1];
+        if (v0 >= v1) return false;
+        if (v0 >= num_vertices) return false;
+        if (v1 >= num_vertices) return false;
+    }
+    return true;
+}
+
+template <int dim>
+bool check_triangles(const SimplicialColumn<dim>& columns)
+{
+    const size_t num_triangles = columns.get_num_spatial_triangles();
+    auto edges = columns.get_spatial_edges();
+    auto triangles = columns.get_spatial_triangles();
+
+    auto check_adj_edges = [&](SignedIndex e0, SignedIndex e1) {
+        Index e0_id = index(e0);
+        Index e1_id = index(e1);
+        bool e0_ori = orientation(e0);
+        bool e1_ori = orientation(e1);
+
+        // Local ids
+        Index e0_li = e0_ori ? 1 : 0;
+        Index e1_li = e1_ori ? 0 : 1;
+
+        return edges[e0_id * 2 + e0_li] == edges[e1_id * 2 + e1_li];
+    };
+
+    for (size_t i = 0; i < num_triangles; i++) {
+        SignedIndex e01 = triangles[i * 3];
+        SignedIndex e12 = triangles[i * 3 + 1];
+        SignedIndex e20 = triangles[i * 3 + 2];
+
+        if (!check_adj_edges(e01, e12)) return false;
+        if (!check_adj_edges(e12, e20)) return false;
+        if (!check_adj_edges(e20, e01)) return false;
+    }
+
+    return true;
+}
+
+template <int dim>
+bool check_tetrahedra(const SimplicialColumn<dim>& columns)
+{
+    const size_t num_tets = columns.get_num_spatial_tetrahedra();
+
+    auto triangles = columns.get_spatial_triangles();
+    auto tets = columns.get_spatial_tetrahedra();
+
+    for (size_t i = 0; i < num_tets; i++) {
+        SignedIndex t021 = tets[i * 4];
+        SignedIndex t123 = tets[i * 4 + 1];
+        SignedIndex t013 = tets[i * 4 + 2];
+        SignedIndex t032 = tets[i * 4 + 3];
+
+        Index t021_id = index(t021);
+        Index t123_id = index(t123);
+        Index t013_id = index(t013);
+        Index t032_id = index(t032);
+
+        int32_t t021_ori = orientation(t021) ? 1 : -1;
+        int32_t t123_ori = orientation(t123) ? 1 : -1;
+        int32_t t013_ori = orientation(t013) ? 1 : -1;
+        int32_t t032_ori = orientation(t032) ? 1 : -1;
+
+        int32_t sum = 0;
+
+        for (size_t j = 0; j < 3; j++) {
+            sum += value_of(triangles[t021_id * 3 + j]) * t021_ori;
+            sum += value_of(triangles[t123_id * 3 + j]) * t123_ori;
+            sum += value_of(triangles[t013_id * 3 + j]) * t013_ori;
+            sum += value_of(triangles[t032_id * 3 + j]) * t032_ori;
+        }
+
+        assert(sum == 0);
+        if (sum != 0) return false;
+    }
+    return true;
+}
+
+/**
+ * @brief Extracts the zero-crossing times of a vertex.
+ *
+ * @note Function values that equals to `value` will be treated as have positive sign.
+ *
+ * @note When `cyclic` is false, we will add 0 as a zero-crossing time if the first function value
+ * is non-negative, and add 1 as a zero-crossing time if the last function value is negative.
+ *
+ * @param[in] time_samples The time samples of the vertex.
+ * @param[in] function_values The function values of the vertex.
+ * @param[in] value The value to check for zero-crossing.
+ * @param[in] cyclic Whether the time samples are cyclic.
+ * @param[out] zero_crossing_times The output vector to store the zero-crossing times.
+ */
+void extract_vertex_zero_crossing(
+    std::span<const Scalar> time_samples,
+    std::span<const Scalar> function_values,
+    Scalar value,
+    bool cyclic,
+    std::vector<Scalar>& zero_crossing_times);
+
+std::tuple<std::vector<Scalar>, std::vector<size_t>, std::vector<bool>> extract_contour_vertices(
+    const std::vector<Scalar>& time_samples,
+    const std::vector<Scalar>& function_values,
+    const std::vector<Index>& vertex_start_indices,
+    Scalar value,
+    bool cyclic);
+
+std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
+    const std::vector<Scalar>& contour_times,
+    const std::vector<size_t>& contour_time_indices,
+    const std::vector<bool>& initial_signs,
+    const std::vector<Index>& edges,
+    bool cyclic);
+
+std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> extract_contour_cycles(
+    const size_t num_contour_vertices,
+    const std::vector<Index>& contour_segments,
+    const std::vector<Index>& contour_segment_indices,
+    const std::vector<Index>& edges,
+    const std::vector<SignedIndex>& triangles);
+
+} // namespace mtetcol
