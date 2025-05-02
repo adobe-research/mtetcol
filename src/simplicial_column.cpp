@@ -1,7 +1,7 @@
 #include <mtetcol/simplicial_column.h>
+#include <mtetcol/logger.h>
 
 #include "hashmap.h"
-#include "logger.h"
 #include "utils.h"
 
 #include <spdlog/spdlog.h>
@@ -133,6 +133,8 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
             contour_segment_indices,
             m_edges,
             m_triangles);
+    assert(contour_cycle_triangle_indices.back() == contour_cycle_indices.size() - 1);
+    assert(contour_cycle_indices.back() == contour_cycles.size());
 
     auto [contour_polyhedra, contour_polyhedron_indices, contour_polyhedron_tet_indices] =
         extract_contour_polyhedra(
@@ -165,6 +167,13 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
         contour.add_cycle(std::span<SignedIndex>(
             contour_cycles.data() + contour_cycle_indices[i],
             contour_cycle_indices[i + 1] - contour_cycle_indices[i]));
+    }
+
+    size_t num_polyhedra = contour_polyhedron_indices.size() - 1;
+    for (size_t i = 0; i < num_polyhedra; i++) {
+        contour.add_polyhedron(std::span<SignedIndex>(
+            contour_polyhedra.data() + contour_polyhedron_indices[i],
+            contour_polyhedron_indices[i + 1] - contour_polyhedron_indices[i]));
     }
 
     return contour;

@@ -3,8 +3,6 @@
 #include <mtetcol/common.h>
 #include <mtetcol/simplicial_column.h>
 
-#include "logger.h"
-
 #include <span>
 #include <vector>
 
@@ -210,6 +208,7 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
 /**
  * @brief Extracts the contour polyhedra from the contour cycles.
  *
+ * @param num_contour_segments The number of contour segments.
  * @param contour_cycles The contour cycles.
  * @param contour_cycle_indices Indices separating the individual cycles.
  * @param contour_cycle_triangle_indices Indices separating the contour cycles of each spatial
@@ -223,6 +222,7 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
  */
 std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>>
 extract_contour_polyhedra(
+    size_t num_contour_segments,
     const std::vector<SignedIndex>& contour_cycles,
     const std::vector<Index>& contour_cycle_indices,
     const std::vector<Index>& contour_cycle_triangle_indices,

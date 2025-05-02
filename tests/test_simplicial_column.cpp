@@ -1,8 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-#include "logger.h"
-
+#include <mtetcol/logger.h>
 #include <mtetcol/simplicial_column.h>
 
 TEST_CASE("simplicial_column", "[mtetcol]")
@@ -47,7 +46,12 @@ TEST_CASE("simplicial_column", "[mtetcol]")
 
     auto check_sphere_translation_time_derivative = [&](Scalar x, Scalar y, Scalar z, Scalar t) {
         return finite_difference(
-            sphere_translation, sphere_translation_time_derivative, x, y, z, t);
+            sphere_translation,
+            sphere_translation_time_derivative,
+            x,
+            y,
+            z,
+            t);
     };
 
     auto sphere_rotation = [](Scalar x, Scalar y, Scalar z, Scalar t) -> Scalar {
@@ -76,13 +80,13 @@ TEST_CASE("simplicial_column", "[mtetcol]")
     };
 
     auto check_sphere_rotation_time_derivative = [&](Scalar x, Scalar y, Scalar z, Scalar t) {
-        finite_difference(
-            sphere_rotation, sphere_rotation_time_derivative, x, y, z, t);
+        finite_difference(sphere_rotation, sphere_rotation_time_derivative, x, y, z, t);
     };
 
     auto populate_columns = [&](mtetcol::SimplicialColumn<4>& columns,
-            size_t num_time_samples_per_vertex,
-            auto& f, auto& df) {
+                                size_t num_time_samples_per_vertex,
+                                auto& f,
+                                auto& df) {
         auto vertices = columns.get_spatial_vertices();
         size_t num_vertices = vertices.size() / 3;
 
@@ -98,14 +102,13 @@ TEST_CASE("simplicial_column", "[mtetcol]")
             Scalar x = vertices[i * 3];
             Scalar y = vertices[i * 3 + 1];
             Scalar z = vertices[i * 3 + 2];
-            for (size_t j=0; j < num_time_samples_per_vertex; j++) {
+            for (size_t j = 0; j < num_time_samples_per_vertex; j++) {
                 Scalar t = static_cast<Scalar>(j) / (num_time_samples_per_vertex - 1);
                 time_samples.push_back(t);
                 function_values.push_back(df(x, y, z, t));
                 finite_difference(f, df, x, y, z, t);
             }
-            start_indices.push_back(
-                static_cast<Index>(time_samples.size()));
+            start_indices.push_back(static_cast<Index>(time_samples.size()));
         }
 
         columns.set_time_samples(
@@ -126,7 +129,7 @@ TEST_CASE("simplicial_column", "[mtetcol]")
             REQUIRE(segment[1] < num_vertices);
         }
 
-        for (size_t ci=0; ci < num_cycles; ci++) {
+        for (size_t ci = 0; ci < num_cycles; ci++) {
             auto cycle = columns.get_cycle(ci);
             size_t cycle_size = cycle.size();
             for (size_t i = 0; i < cycle_size; i++) {
@@ -151,11 +154,15 @@ TEST_CASE("simplicial_column", "[mtetcol]")
     };
 
     auto check_translation = [&](mtetcol::SimplicialColumn<4>& columns,
-                                size_t num_time_samples_per_vertex) {
+                                 size_t num_time_samples_per_vertex) {
         populate_columns(
-            columns, num_time_samples_per_vertex, sphere_translation,
+            columns,
+            num_time_samples_per_vertex,
+            sphere_translation,
             sphere_translation_time_derivative);
+        //mtetcol::logger().set_level(spdlog::level::debug);
         auto contour = columns.extract_contour(0, false);
+        //mtetcol::logger().set_level(spdlog::level::warn);
 
         REQUIRE(contour.get_num_vertices() == columns.get_num_spatial_vertices());
         REQUIRE(contour.get_num_segments() == columns.get_num_spatial_edges());
@@ -165,30 +172,32 @@ TEST_CASE("simplicial_column", "[mtetcol]")
     };
 
     auto check_rotation = [&](mtetcol::SimplicialColumn<4>& columns,
-            size_t num_time_samples_per_vertex) {
+                              size_t num_time_samples_per_vertex) {
         populate_columns(
-            columns, num_time_samples_per_vertex, sphere_rotation,
+            columns,
+            num_time_samples_per_vertex,
+            sphere_rotation,
             sphere_rotation_time_derivative);
         auto contour = columns.extract_contour(0, false);
         check_contour(contour);
 
-        //mtetcol::logger().set_level(spdlog::level::debug);
+        // mtetcol::logger().set_level(spdlog::level::debug);
         auto cyclic_contour = columns.extract_contour(0, true);
         check_contour(cyclic_contour);
-        //mtetcol::logger().set_level(spdlog::level::warn);
+        // mtetcol::logger().set_level(spdlog::level::warn);
     };
 
     SECTION("Derivative test")
     {
-        //finite_difference(
-        //    sphere_rotation, sphere_rotation_time_derivative, 1, 0, 0, 0);
-        //Scalar d0 = sphere_rotation_time_derivative(1, 0, 0, 0);
-        //Scalar d1 = sphere_rotation_time_derivative(1, 0, 0, 0.001);
-        //Scalar d2 = sphere_rotation_time_derivative(1, 0, 0, -0.001);
-        //Scalar d3 = sphere_rotation_time_derivative(1, 0, 0, 0.999);
-        //REQUIRE_THAT(d0, Catch::Matchers::WithinRel(d1, 1e-3));
-        //REQUIRE_THAT(sphere_rotation_time_derivative(1, 0, 0, 1),
-        //    Catch::Matchers::WithinAbs(0, 1e-3));
+        // finite_difference(
+        //     sphere_rotation, sphere_rotation_time_derivative, 1, 0, 0, 0);
+        // Scalar d0 = sphere_rotation_time_derivative(1, 0, 0, 0);
+        // Scalar d1 = sphere_rotation_time_derivative(1, 0, 0, 0.001);
+        // Scalar d2 = sphere_rotation_time_derivative(1, 0, 0, -0.001);
+        // Scalar d3 = sphere_rotation_time_derivative(1, 0, 0, 0.999);
+        // REQUIRE_THAT(d0, Catch::Matchers::WithinRel(d1, 1e-3));
+        // REQUIRE_THAT(sphere_rotation_time_derivative(1, 0, 0, 1),
+        //     Catch::Matchers::WithinAbs(0, 1e-3));
     }
 
     SECTION("Single tet")

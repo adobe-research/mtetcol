@@ -15,7 +15,7 @@ using Index = uint32_t;
 /**
  * Signed index to represent both orientation and index.
  */
-using SignedIndex = strong::type<int32_t, struct SignedIndexTag>;
+using SignedIndex = strong::type<int32_t, struct SignedIndexTag, strong::equality>;
 
 constexpr Index invalid_index = std::numeric_limits<Index>::max();
 constexpr SignedIndex invalid_signed_index = SignedIndex(0);

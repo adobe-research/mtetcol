@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <mtetcol/common.h>
+#include <mtetcol/logger.h>
 
 namespace mtetcol {
 
@@ -270,14 +271,19 @@ private:
      */
     bool check_polyhedron(Index poly_id) const
     {
+        logger().trace("Check polyhedron {}", poly_id);
         int32_t sum = 0;
         auto poly = get_polyhedron(poly_id);
         for (auto ci : poly) {
+            logger().trace("Check cycle {}", index(ci));
             auto cycle = get_cycle(index(ci));
+            int32_t sign = orientation(ci) ? 1 : -1;
             for (auto si : cycle) {
-                sum += value_of(si);
+                logger().trace("Check segment {}", value_of(si));
+                sum += value_of(si) * sign;
             }
         }
+        assert(sum == 0);
         return sum == 0;
     }
 

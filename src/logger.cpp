@@ -1,4 +1,4 @@
-#include "logger.h"
+#include <mtetcol/logger.h>
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 
