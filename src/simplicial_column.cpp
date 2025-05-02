@@ -1,6 +1,10 @@
 #include <ankerl/unordered_dense.h>
 #include <mtetcol/simplicial_column.h>
 
+#include "logger.h"
+
+#include <spdlog/spdlog.h>
+
 #include <array>
 #include <cassert>
 #include <cmath>
@@ -455,7 +459,7 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
         if (!ori) {
             std::swap(v0, v1);
         }
-        std::cout << "edge: (" << v0 << ", " << v1 << ")" << std::endl;
+        logger().debug("edge: ({}, {})", v0, v1);
     };
 
     auto print_segment = [&](Index eid, bool ori) {
@@ -468,12 +472,12 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
             Index v1 = contour_segments[start + si * 2 + 1];
             if (!ori) std::swap(v0, v1);
 
-            std::cout << "segment: (" << v0 << ", " << v1 << ")" << std::endl;
+            logger().debug("segment: ({}, {})", v0, v1);
         }
     };
 
     auto register_next_index = [&](Index eid, bool ori) {
-        std::cout << "eid: " << eid << ", ori: " << ori << std::endl;
+        logger().debug("eid: {}, ori: {}", eid, ori);
         assert(eid >= 0 && eid + 1 < contour_segment_indices.size());
         Index start = contour_segment_indices[eid];
         Index end = contour_segment_indices[eid + 1];
@@ -486,8 +490,7 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
             assert(v0 < num_contour_vertices);
             assert(next_index[v0] == invalid_index);
             next_index[v0] = start / 2 + si;
-            std::cout << "Registering next index: (" << v0 << ", " << v1 << ") -> "
-                      << next_index[v0] << std::endl;
+            logger().debug("registering next index: ({}, {}) -> {}", v0, v1, next_index[v0]);
         }
     };
 
@@ -531,7 +534,7 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
     assert(triangles.size() % 3 == 0);
     const size_t num_triangles = triangles.size() / 3;
     for (size_t ti = 0; ti < num_triangles; ti++) {
-        std::cout << "Triangle " << ti << ": " << std::endl;
+        logger().debug("Triangle {}", ti);
         SignedIndex e01 = triangles[ti * 3];
         SignedIndex e12 = triangles[ti * 3 + 1];
         SignedIndex e20 = triangles[ti * 3 + 2];

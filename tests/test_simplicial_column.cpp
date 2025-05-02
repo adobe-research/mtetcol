@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include "logger.h"
+
 #include <mtetcol/simplicial_column.h>
 
 TEST_CASE("simplicial_column", "[mtetcol]")
@@ -129,7 +131,10 @@ TEST_CASE("simplicial_column", "[mtetcol]")
             columns, num_time_samples_per_vertex, sphere_rotation,
             sphere_rotation_time_derivative);
         auto contour = columns.extract_contour(0, false);
+
+        mtetcol::logger().set_level(spdlog::level::debug);
         auto cyclic_contour = columns.extract_contour(0, true);
+        mtetcol::logger().set_level(spdlog::level::warn);
 
         // TODO: add some checks
     };

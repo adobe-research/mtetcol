@@ -7,6 +7,7 @@ option(MTETCOL_BUILD_TESTS "Build tests" OFF)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 include(strong_type)
 include(unordered_dense)
+include(spdlog)
 
 file(GLOB INC_FILES ${CMAKE_CURRENT_LIST_DIR}/include/mtetcol/*.h)
 file(GLOB SRC_FILES ${CMAKE_CURRENT_LIST_DIR}/src/*.cpp)
@@ -18,6 +19,7 @@ target_link_libraries(mtetcol
     strong_type::strong_type
     PRIVATE
     unordered_dense::unordered_dense
+    spdlog::spdlog
 )
 
 add_library(mtetcol::mtetcol ALIAS mtetcol)
@@ -38,7 +40,9 @@ if(MTETCOL_BUILD_TESTS)
         PRIVATE
         mtetcol::mtetcol
         Catch2::Catch2WithMain
+        spdlog::spdlog
     )
+    target_include_directories(mtetcol_tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
     target_compile_definitions(mtetcol_tests PRIVATE CATCH_CONFIG_ENABLE_BENCHMARKING)
     target_compile_features(mtetcol_tests PRIVATE cxx_std_20)
 
