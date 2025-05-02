@@ -207,4 +207,25 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
     const std::vector<Index>& edges,
     const std::vector<SignedIndex>& triangles);
 
+/**
+ * @brief Extracts the contour polyhedra from the contour cycles.
+ *
+ * @param contour_cycles The contour cycles.
+ * @param contour_cycle_indices Indices separating the individual cycles.
+ * @param contour_cycle_triangle_indices Indices separating the contour cycles of each spatial
+ * triangle.
+ * @param tetrahedra The spatial tetrahedra of the simplicial column.
+ *
+ * @return A tuple containing:
+ * - A vector of signed indices of contour cycles representing the contour polyhedra.
+ * - A vector of indices separating the individual polyhedra.
+ * - A vector of indices separating the contour polyhedra of each spatial tetrahedron.
+ */
+std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>>
+extract_contour_polyhedra(
+    const std::vector<SignedIndex>& contour_cycles,
+    const std::vector<Index>& contour_cycle_indices,
+    const std::vector<Index>& contour_cycle_triangle_indices,
+    const std::vector<SignedIndex>& tetrahedra);
+
 } // namespace mtetcol

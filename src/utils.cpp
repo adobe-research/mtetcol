@@ -353,4 +353,123 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
     return {contour_cycles, contour_cycle_indices, contour_cycle_triangle_indices};
 }
 
+std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>>
+extract_contour_polyhedra(
+    size_t num_contour_segments,
+    const std::vector<SignedIndex>& contour_cycles,
+    const std::vector<Index>& contour_cycle_indices,
+    const std::vector<Index>& contour_cycle_triangle_indices,
+    const std::vector<SignedIndex>& tetrahedra)
+{
+    size_t num_cycles = contour_cycle_indices.size() - 1;
+    size_t num_triangles = contour_cycle_triangle_indices.size() - 1;
+    size_t num_tets = tetrahedra.size() / 4;
+
+    std::vector<SignedIndex> polyhedra;
+    std::vector<Index> polyhedron_indices;
+    std::vector<Index> polyhedron_tet_indices;
+    polyhedra.reserve(num_cycles * 2);
+    polyhedron_indices.reserve(num_cycles + 1);
+    polyhedron_tet_indices.reserve(num_tets + 1);
+    polyhedra_indices.push_back(0);
+    polyhedron_tet_indices.push_back(0);
+
+    // Map from segment index to the cycle containing the it and is conistently oriented.
+    std::vector<SignedIndex> positive_segment_map(num_contour_segments, invalid_signed_index);
+    // Map from segment index to the cycle containing the it and has opposite orientation.
+    std::vector<SignedIndex> negative_segment_map(num_contour_segments, invalid_signed_index);
+    // Map from cycle index to its relative orientation to the tet column.
+    std::vector<bool> cycle_orientations(num_cycles, false);
+    // Tracking whether a cycle has been processed.
+    std::vector<bool> involved(num_cycles, false);
+
+    auto clear_register_cycle = [&](Index cycle_id) {
+        for (Index i = cycle_begin; i < cycle_end; i++) {
+            SignedIndex si = contour_cycles[i];
+            Index seg_id = index(si);
+            positive_segment_map[seg_id] = invalid_signed_index;
+            negative_segment_map[seg_id] = invalid_signed_index;
+        }
+    };
+
+    auto register_cycle = [&](Index cycle_id, bool orientation) {
+        Index cycle_begin = contour_cycle_indices[cycle_id];
+        Index cycle_end = contour_cycle_indices[cycle_id + 1];
+        for (Index i = cycle_begin; i < cycle_end; i++) {
+            SignedIndex si = contour_cycles[i];
+            Index seg_id = index(si);
+            assert(seg_id < num_contour_segments);
+            bool seg_ori = orientation(si);
+
+            if (seg_ori != orientation) {
+                assert(positive_segment_map[seg_id] == invalid_signed_index);
+                negative_segment_map[seg_id] = signed_index(cycle_id, orientation);
+            } else {
+                assert(negative_segment_map[seg_id] == invalid_signed_index);
+                positive_segment_map[seg_id] = signed_index(cycle_id, orientation);
+            }
+        }
+    };
+
+    auto register_cycles = [&](Index cycle_index_begin, Index cycle_index_end, bool orientation) {
+        for (Index ci = cycle_index_begin; ci < cycle_index_end; ci++) {
+            assert(ci < num_cycles);
+            cycle_orientations[ci] = orientation;
+            register_cycle(ci, orientation);
+        }
+    };
+
+    auto compute_components = [&](Index cycles_021_begin,
+                                  Index cycles_021_end,
+                                  Index cycles_123_begin,
+                                  Index cycles_123_end,
+                                  Index cycles_013_begin,
+                                  Index cycles_013_end,
+                                  Index cycles_032_begin,
+                                  Index cycles_032_end,
+                                  bool t021_ori,
+                                  bool t123_ori,
+                                  bool t013_ori,
+                                  bool t032_ori) {
+        clear_register_cycle(cycles_021_begin, cycles_021_end);
+        clear_register_cycle(cycles_123_begin, cycles_123_end);
+        clear_register_cycle(cycles_013_begin, cycles_013_end);
+        clear_register_cycle(cycles_032_begin, cycles_032_end);
+
+        register_cycles(cycles_021_begin, cycles_021_end, t021_ori);
+        register_cycles(cycles_123_begin, cycles_123_end, t123_ori);
+        register_cycles(cycles_013_begin, cycles_013_end, t013_ori);
+        register_cycles(cycles_032_begin, cycles_032_end, t032_ori);
+
+        extract_components(cycles_021_begin, cycles_021_end, t021_ori);
+    };
+
+    for (size_t ti = 0; ti < num_tets; ti++) {
+        SignedIndex t021 = tetrahedra[ti * 4];
+        SignedIndex t123 = tetrahedra[ti * 4 + 1];
+        SignedIndex t013 = tetrahedra[ti * 4 + 2];
+        SignedIndex t032 = tetrahedra[ti * 4 + 3];
+
+        Index t021_id = index(t021);
+        Index t123_id = index(t123);
+        Index t013_id = index(t013);
+        Index t032_id = index(t032);
+
+        assert(t021_id < num_triangles);
+        assert(t123_id < num_triangles);
+        assert(t013_id < num_triangles);
+        assert(t032_id < num_triangles);
+
+        bool t021_ori = orientation(t021);
+        bool t123_ori = orientation(t123);
+        bool t013_ori = orientation(t013);
+        bool t032_ori = orientation(t032);
+    }
+
+    return {
+        std::move(polyhedra),
+        std::move(polyhedron_indices),
+        std::move(polyhedron_tet_indices)};
+}
+
 } // namespace mtetcol

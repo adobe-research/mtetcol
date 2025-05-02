@@ -114,6 +114,42 @@ TEST_CASE("simplicial_column", "[mtetcol]")
             std::span<Index>(start_indices.data(), start_indices.size()));
     };
 
+    auto check_contour = [&](mtetcol::Contour<4>& columns) {
+        size_t num_vertices = columns.get_num_vertices();
+        size_t num_segments = columns.get_num_segments();
+        size_t num_cycles = columns.get_num_cycles();
+
+        for (size_t si = 0; si < num_segments; si++) {
+            auto segment = columns.get_segment(si);
+            REQUIRE(segment.size() == 2);
+            REQUIRE(segment[0] < num_vertices);
+            REQUIRE(segment[1] < num_vertices);
+        }
+
+        for (size_t ci=0; ci < num_cycles; ci++) {
+            auto cycle = columns.get_cycle(ci);
+            size_t cycle_size = cycle.size();
+            for (size_t i = 0; i < cycle_size; i++) {
+                SignedIndex curr_signed_si = cycle[i];
+                SignedIndex next_signed_si = cycle[(i + 1) % cycle_size];
+
+                Index curr_si = index(curr_signed_si);
+                Index next_si = index(next_signed_si);
+
+                bool curr_ori = orientation(curr_signed_si);
+                bool next_ori = orientation(next_signed_si);
+
+                auto curr_segment = columns.get_segment(curr_si);
+                auto next_segment = columns.get_segment(next_si);
+
+                Index v0 = curr_ori ? curr_segment[1] : curr_segment[0];
+                Index v1 = next_ori ? next_segment[0] : next_segment[1];
+
+                REQUIRE(v0 == v1);
+            }
+        }
+    };
+
     auto check_translation = [&](mtetcol::SimplicialColumn<4>& columns,
                                 size_t num_time_samples_per_vertex) {
         populate_columns(
@@ -123,6 +159,9 @@ TEST_CASE("simplicial_column", "[mtetcol]")
 
         REQUIRE(contour.get_num_vertices() == columns.get_num_spatial_vertices());
         REQUIRE(contour.get_num_segments() == columns.get_num_spatial_edges());
+        REQUIRE(contour.get_num_cycles() == columns.get_num_spatial_triangles());
+
+        check_contour(contour);
     };
 
     auto check_rotation = [&](mtetcol::SimplicialColumn<4>& columns,
@@ -131,12 +170,12 @@ TEST_CASE("simplicial_column", "[mtetcol]")
             columns, num_time_samples_per_vertex, sphere_rotation,
             sphere_rotation_time_derivative);
         auto contour = columns.extract_contour(0, false);
+        check_contour(contour);
 
-        mtetcol::logger().set_level(spdlog::level::debug);
+        //mtetcol::logger().set_level(spdlog::level::debug);
         auto cyclic_contour = columns.extract_contour(0, true);
-        mtetcol::logger().set_level(spdlog::level::warn);
-
-        // TODO: add some checks
+        check_contour(cyclic_contour);
+        //mtetcol::logger().set_level(spdlog::level::warn);
     };
 
     SECTION("Derivative test")

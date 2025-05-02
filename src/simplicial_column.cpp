@@ -134,6 +134,14 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
             m_edges,
             m_triangles);
 
+    auto [contour_polyhedra, contour_polyhedron_indices, contour_polyhedron_tet_indices] =
+        extract_contour_polyhedra(
+            contour_segments.size() / 2,
+            contour_cycles,
+            contour_cycle_indices,
+            contour_cycle_triangle_indices,
+            m_tetrahedra);
+
     Contour<4> contour;
 
     size_t num_contour_vertices = contour_time_indices.size() - 1;
