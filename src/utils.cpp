@@ -367,13 +367,6 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
         clear_next_index(e12_id);
         clear_next_index(e20_id);
 
-        print_edge(e01_id, e01_ori);
-        print_segment(e01_id, e01_ori);
-        print_edge(e12_id, e12_ori);
-        print_segment(e12_id, e12_ori);
-        print_edge(e20_id, e20_ori);
-        print_segment(e20_id, e20_ori);
-
         register_next_index(e01_id, e01_ori);
         register_next_index(e12_id, e12_ori);
         register_next_index(e20_id, e20_ori);
