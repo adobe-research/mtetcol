@@ -2,9 +2,11 @@
 
 #include <mtetcol/common.h>
 #include <mtetcol/simplicial_column.h>
+#include <mtetcol/logger.h>
 
 #include <span>
 #include <vector>
+#include <tuple>
 
 namespace mtetcol {
 
@@ -123,18 +125,17 @@ bool check_tetrahedra(const SimplicialColumn<dim>& columns)
 }
 
 /**
- * @brief Extracts the zero-crossing times of a vertex.
- *
- * @note Function values that equals to `value` will be treated as have positive sign.
- *
- * @note When `cyclic` is false, we will add 0 as a zero-crossing time if the first function value
- * is non-negative, and add 1 as a zero-crossing time if the last function value is negative.
- *
- * @param[in] time_samples The time samples of the vertex.
- * @param[in] function_values The function values of the vertex.
- * @param[in] value The value to check for zero-crossing.
- * @param[in] cyclic Whether the time samples are cyclic.
- * @param[out] zero_crossing_times The output vector to store the zero-crossing times.
+ * @brief Extracts zero-crossing times from a vertex's time series data.
+ * 
+ * This function finds all points in time where a function's value crosses a given threshold.
+ * It supports both cyclic and non-cyclic time series data.
+ * 
+ * @param time_samples A span of time points, must start at 0 and end at 1
+ * @param function_values A span of function values corresponding to the time points
+ * @param value The threshold value to detect crossings
+ * @param cyclic Whether the time series is cyclic (wraps around)
+ * @param zero_crossing_times Output vector to store the crossing times
+ * @throws std::invalid_argument if input validation fails
  */
 void extract_vertex_zero_crossing(
     std::span<const Scalar> time_samples,
@@ -144,18 +145,21 @@ void extract_vertex_zero_crossing(
     std::vector<Scalar>& zero_crossing_times);
 
 /**
- * @brief Extracts the iso-contour vertices of all spatial vertices.
- *
- * @param[in] time_samples The time samples of the vertices.
- * @param[in] function_values The function values of the vertices.
- * @param[in] vertex_start_indices The start indices of the vertices.
- * @param[in] value The target isovalue to check for zero-crossing.
- * @param[in] cyclic Whether the time samples are cyclic.
- *
- * @return A tuple containing:
- * - A vector of zero-crossing times.
- * - Indices separating the zero-crossing times of each spatial vertex.
- * - A vector of initial function signs for each spatial vertex.
+ * @brief Extracts contour vertices from a set of time series data.
+ * 
+ * This function processes multiple vertices' time series data to find contour vertices
+ * where the function values cross a given threshold. It handles both cyclic and non-cyclic data.
+ * 
+ * @param time_samples Vector of time points for all vertices
+ * @param function_values Vector of function values for all vertices
+ * @param vertex_start_indices Indices marking the start of each vertex's data
+ * @param value The threshold value to detect crossings
+ * @param cyclic Whether the time series are cyclic
+ * @return Tuple containing:
+ *         - Vector of zero-crossing times
+ *         - Vector of indices separating each vertex's crossings
+ *         - Vector of initial signs for each vertex
+ * @throws std::invalid_argument if input validation fails
  */
 std::tuple<std::vector<Scalar>, std::vector<size_t>, std::vector<bool>> extract_contour_vertices(
     const std::vector<Scalar>& time_samples,

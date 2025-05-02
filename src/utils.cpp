@@ -3,6 +3,8 @@
 #include <mtetcol/logger.h>
 
 #include <functional>
+#include <stdexcept>
+#include <array>
 
 namespace mtetcol {
 
@@ -13,19 +15,27 @@ void extract_vertex_zero_crossing(
     bool cyclic,
     std::vector<Scalar>& zero_crossing_times)
 {
-    assert(time_samples.front() == 0);
-    assert(time_samples.back() == 1);
-    size_t num_samples = time_samples.size();
-    assert(num_samples >= 2);
-    assert(num_samples == function_values.size());
-    zero_crossing_times.reserve(zero_crossing_times.size() + num_samples);
+    if (time_samples.empty() || function_values.empty()) {
+        throw std::invalid_argument("Time samples and function values must not be empty");
+    }
+    if (time_samples.size() != function_values.size()) {
+        throw std::invalid_argument("Time samples and function values must have the same size");
+    }
+    if (time_samples.size() < 2) {
+        throw std::invalid_argument("At least 2 samples are required");
+    }
+    if (time_samples.front() != 0 || time_samples.back() != 1) {
+        throw std::invalid_argument("Time samples must start at 0 and end at 1");
+    }
+
+    zero_crossing_times.reserve(zero_crossing_times.size() + time_samples.size());
 
     if (!cyclic && function_values[0] >= value) {
         zero_crossing_times.push_back(time_samples[0]);
     }
 
-    for (size_t i = 0; i < num_samples; i++) {
-        size_t next_i = (i + 1) % num_samples;
+    for (size_t i = 0; i < time_samples.size(); i++) {
+        size_t next_i = (i + 1) % time_samples.size();
         if (!cyclic && next_i == 0) break;
 
         if ((function_values[i] < value && function_values[next_i] < value) ||
@@ -44,8 +54,8 @@ void extract_vertex_zero_crossing(
         }
     }
 
-    if (!cyclic && function_values[num_samples - 1] < value) {
-        zero_crossing_times.push_back(time_samples[num_samples - 1]);
+    if (!cyclic && function_values[time_samples.size() - 1] < value) {
+        zero_crossing_times.push_back(time_samples[time_samples.size() - 1]);
     }
 }
 
@@ -56,6 +66,13 @@ std::tuple<std::vector<Scalar>, std::vector<size_t>, std::vector<bool>> extract_
     Scalar value,
     bool cyclic)
 {
+    if (vertex_start_indices.empty()) {
+        throw std::invalid_argument("Vertex start indices must not be empty");
+    }
+    if (vertex_start_indices.back() > time_samples.size()) {
+        throw std::invalid_argument("Vertex start indices exceed time samples size");
+    }
+
     size_t num_vertices = vertex_start_indices.size() - 1;
 
     std::vector<Scalar> zero_crossing_times;
@@ -65,14 +82,26 @@ std::tuple<std::vector<Scalar>, std::vector<size_t>, std::vector<bool>> extract_
     zero_crossing_indices.reserve(num_vertices + 1);
     zero_crossing_indices.push_back(0);
     initial_signs.reserve(num_vertices);
+
+    // Process each vertex
     for (size_t vi = 0; vi < num_vertices; vi++) {
-        const Index idx_begein = vertex_start_indices[vi];
+        const Index idx_begin = vertex_start_indices[vi];
         const Index idx_end = vertex_start_indices[vi + 1];
-        std::span<const Scalar> time_samples_i =
-            std::span<const Scalar>(time_samples.data() + idx_begein, idx_end - idx_begein);
-        std::span<const Scalar> function_values_i =
-            std::span<const Scalar>(function_values.data() + idx_begein, idx_end - idx_begein);
-        initial_signs.push_back(function_values_i[0] >= value ? true : false);
+        
+        if (idx_begin >= idx_end) {
+            throw std::invalid_argument("Invalid vertex start indices");
+        }
+
+        std::span<const Scalar> time_samples_i(
+            time_samples.data() + idx_begin, 
+            idx_end - idx_begin
+        );
+        std::span<const Scalar> function_values_i(
+            function_values.data() + idx_begin, 
+            idx_end - idx_begin
+        );
+
+        initial_signs.push_back(function_values_i[0] >= value);
 
         extract_vertex_zero_crossing(
             time_samples_i,
