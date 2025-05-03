@@ -1,4 +1,4 @@
-#include "disjoint_cycles.h"
+#include <mtetcol/disjoint_cycles.h>
 
 #include <cassert>
 

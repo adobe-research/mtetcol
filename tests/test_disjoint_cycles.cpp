@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <disjoint_cycles.h>
+#include <mtetcol/disjoint_cycles.h>
 
 #include <vector>
 
