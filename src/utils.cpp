@@ -1,6 +1,7 @@
 #include "utils.h"
 
 #include <mtetcol/logger.h>
+#include <mtetcol/disjoint_cycles.h>
 
 #include <SmallVector.h>
 
@@ -247,8 +248,6 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
     const std::vector<Index>& edges,
     const std::vector<SignedIndex>& triangles)
 {
-    // Map from contour vertex index to contour segement index.
-    std::vector<Index> next_index(num_contour_vertices, invalid_index);
     std::vector<SignedIndex> contour_cycles;
     std::vector<Index> contour_cycle_indices;
     std::vector<Index> contour_cycle_triangle_indices;
@@ -256,94 +255,18 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
     contour_cycle_indices.push_back(0);
     contour_cycle_triangle_indices.push_back(0);
 
-    assert(contour_segments.size() % 2 == 0);
-    const size_t num_segments = contour_segments.size() / 2;
+    DisjointCycles cycle_engine(num_contour_vertices, contour_segments);
 
-    auto clear_next_index = [&](Index eid) {
-        assert(eid >= 0 && eid + 1 < contour_segment_indices.size());
-        Index start = contour_segment_indices[eid];
-        Index end = contour_segment_indices[eid + 1];
-        assert((end - start) % 2 == 0);
-        for (Index i = start; i < end; i++) {
-            next_index[contour_segments[i]] = invalid_index;
-        }
-    };
+    auto register_edge = [&](Index e_id, bool ori) {
+        Index seg_begin = contour_segment_indices[e_id];
+        Index seg_end = contour_segment_indices[e_id + 1];
+        assert(seg_begin < seg_end);
+        assert((seg_end - seg_begin) % 2 == 0);
 
-    auto print_edge = [&](Index eid, bool ori) {
-        Index v0 = edges[eid * 2];
-        Index v1 = edges[eid * 2 + 1];
-        if (!ori) {
-            std::swap(v0, v1);
-        }
-        logger().debug("edge: ({}, {})", v0, v1);
-    };
-
-    auto print_segment = [&](Index eid, bool ori) {
-        Index start = contour_segment_indices[eid];
-        Index end = contour_segment_indices[eid + 1];
-
-        Index num_segments_over_edge = (end - start) / 2;
-        for (size_t si = 0; si < num_segments_over_edge; si++) {
-            Index v0 = contour_segments[start + si * 2];
-            Index v1 = contour_segments[start + si * 2 + 1];
-            if (!ori) std::swap(v0, v1);
-
-            logger().debug("segment: ({}, {})", v0, v1);
-        }
-    };
-
-    auto register_next_index = [&](Index eid, bool ori) {
-        logger().debug("eid: {}, ori: {}", eid, ori);
-        assert(eid >= 0 && eid + 1 < contour_segment_indices.size());
-        Index start = contour_segment_indices[eid];
-        Index end = contour_segment_indices[eid + 1];
-        assert((end - start) % 2 == 0);
-        Index num_segments_over_edge = (end - start) / 2;
-        for (size_t si = 0; si < num_segments_over_edge; si++) {
-            Index v0 = contour_segments[start + si * 2];
-            Index v1 = contour_segments[start + si * 2 + 1];
-            if (!ori) std::swap(v0, v1);
-            assert(v0 < num_contour_vertices);
-            assert(next_index[v0] == invalid_index);
-            next_index[v0] = start / 2 + si;
-            logger().debug("registering next index: ({}, {}) -> {}", v0, v1, next_index[v0]);
-        }
-    };
-
-    auto grow_cycle = [&](Index vid) {
-        assert(next_index[vid] != invalid_index);
-        Index sid = next_index[vid];
-        next_index[vid] = invalid_index;
-
-        Index v0 = contour_segments[sid * 2];
-        Index v1 = contour_segments[sid * 2 + 1];
-
-        if (vid == v0) {
-            contour_cycles.push_back(signed_index(sid, true));
-            return v1;
-        } else {
-            contour_cycles.push_back(signed_index(sid, false));
-            return v0;
-        }
-    };
-
-    auto chain_cycles = [&](Index eid, bool ori) {
-        assert(eid >= 0 && eid + 1 < contour_segment_indices.size());
-        Index start = contour_segment_indices[eid];
-        Index end = contour_segment_indices[eid + 1];
-        assert((end - start) % 2 == 0);
-        Index num_segments_over_edge = (end - start) / 2;
-
-        for (size_t si = 0; si < num_segments_over_edge; si++) {
-            Index v0 = contour_segments[start + si * 2];
-            Index v1 = contour_segments[start + si * 2 + 1];
-            if (!ori) std::swap(v0, v1);
-            if (next_index[v0] == invalid_index) continue;
-
-            while (next_index[v0] != invalid_index) {
-                v0 = grow_cycle(v0);
-            }
-            contour_cycle_indices.push_back(static_cast<Index>(contour_cycles.size()));
+        for (Index i = seg_begin; i < seg_end; i+=2) {
+            Index seg_id = i / 2;
+            SignedIndex si = signed_index(seg_id, ori);
+            cycle_engine.register_segment(si);
         }
     };
 
@@ -351,6 +274,8 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
     const size_t num_triangles = triangles.size() / 3;
     for (size_t ti = 0; ti < num_triangles; ti++) {
         logger().debug("Triangle {}", ti);
+        cycle_engine.clear();
+
         SignedIndex e01 = triangles[ti * 3];
         SignedIndex e12 = triangles[ti * 3 + 1];
         SignedIndex e20 = triangles[ti * 3 + 2];
@@ -363,17 +288,11 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
         bool e12_ori = orientation(e12);
         bool e20_ori = orientation(e20);
 
-        clear_next_index(e01_id);
-        clear_next_index(e12_id);
-        clear_next_index(e20_id);
+        register_edge(e01_id, e01_ori);
+        register_edge(e12_id, e12_ori);
+        register_edge(e20_id, e20_ori);
 
-        register_next_index(e01_id, e01_ori);
-        register_next_index(e12_id, e12_ori);
-        register_next_index(e20_id, e20_ori);
-
-        chain_cycles(e01_id, e01_ori);
-        chain_cycles(e12_id, e12_ori);
-        chain_cycles(e20_id, e20_ori);
+        cycle_engine.extract_cycles(contour_cycles, contour_cycle_indices);
 
         contour_cycle_triangle_indices.push_back(contour_cycle_indices.size() - 1);
     }
