@@ -1,13 +1,14 @@
 #include "utils.h"
 
-#include <mtetcol/logger.h>
+#include <mtetcol/disjoint_components.h>
 #include <mtetcol/disjoint_cycles.h>
+#include <mtetcol/logger.h>
 
 #include <SmallVector.h>
 
+#include <array>
 #include <functional>
 #include <stdexcept>
-#include <array>
 
 namespace mtetcol {
 
@@ -90,19 +91,17 @@ std::tuple<std::vector<Scalar>, std::vector<size_t>, std::vector<bool>> extract_
     for (size_t vi = 0; vi < num_vertices; vi++) {
         const Index idx_begin = vertex_start_indices[vi];
         const Index idx_end = vertex_start_indices[vi + 1];
-        
+
         if (idx_begin >= idx_end) {
             throw std::invalid_argument("Invalid vertex start indices");
         }
 
         std::span<const Scalar> time_samples_i(
-            time_samples.data() + idx_begin, 
-            idx_end - idx_begin
-        );
+            time_samples.data() + idx_begin,
+            idx_end - idx_begin);
         std::span<const Scalar> function_values_i(
-            function_values.data() + idx_begin, 
-            idx_end - idx_begin
-        );
+            function_values.data() + idx_begin,
+            idx_end - idx_begin);
 
         initial_signs.push_back(function_values_i[0] >= value);
 
@@ -263,7 +262,7 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
         assert(seg_begin < seg_end);
         assert((seg_end - seg_begin) % 2 == 0);
 
-        for (Index i = seg_begin; i < seg_end; i+=2) {
+        for (Index i = seg_begin; i < seg_end; i += 2) {
             Index seg_id = i / 2;
             SignedIndex si = signed_index(seg_id, ori);
             cycle_engine.register_segment(si);
@@ -321,111 +320,20 @@ extract_contour_polyhedra(
     polyhedron_indices.push_back(0);
     polyhedron_tet_indices.push_back(0);
 
-    // Map from segment index to the cycle containing the it and is conistently oriented.
-    std::vector<SignedIndex> positive_segment_map(num_contour_segments, invalid_signed_index);
-    // Map from segment index to the cycle containing the it and has opposite orientation.
-    std::vector<SignedIndex> negative_segment_map(num_contour_segments, invalid_signed_index);
-    // Tracking whether a cycle has been processed.
-    std::vector<bool> involved(num_cycles, false);
+    DisjointComponents component_engine(num_contour_segments, contour_cycles, contour_cycle_indices);
 
-    auto clear_register_cycle = [&](Index cycle_id) {
-        assert(cycle_id < num_cycles);
-        involved[cycle_id] = false;
+    auto register_cycles = [&](Index cycles_begin, Index cycles_end, bool ori) {
+        assert(cycles_begin < cycles_end);
 
-        Index cycle_begin = contour_cycle_indices[cycle_id];
-        Index cycle_end = contour_cycle_indices[cycle_id + 1];
-
-        for (Index i = cycle_begin; i < cycle_end; i++) {
-            SignedIndex si = contour_cycles[i];
-            Index seg_id = index(si);
-            positive_segment_map[seg_id] = invalid_signed_index;
-            negative_segment_map[seg_id] = invalid_signed_index;
-        }
-    };
-
-    auto clear_register_cycles = [&](Index cycle_index_begin, Index cycle_index_end) {
-        for (Index ci = cycle_index_begin; ci < cycle_index_end; ci++) {
-            clear_register_cycle(ci);
-        }
-    };
-
-    auto register_cycle = [&](Index cycle_id, bool ori) {
-        Index cycle_begin = contour_cycle_indices[cycle_id];
-        Index cycle_end = contour_cycle_indices[cycle_id + 1];
-        for (Index i = cycle_begin; i < cycle_end; i++) {
-            SignedIndex si = contour_cycles[i];
-            Index seg_id = index(si);
-            assert(seg_id < num_contour_segments);
-            bool seg_ori = orientation(si);
-
-            if (seg_ori != ori) {
-                assert(negative_segment_map[seg_id] == invalid_signed_index);
-                negative_segment_map[seg_id] = signed_index(cycle_id, ori);
-            } else {
-                assert(positive_segment_map[seg_id] == invalid_signed_index);
-                positive_segment_map[seg_id] = signed_index(cycle_id, ori);
-            }
-        }
-    };
-
-    auto register_cycles = [&](Index cycle_index_begin, Index cycle_index_end, bool ori) {
-        for (Index ci = cycle_index_begin; ci < cycle_index_end; ci++) {
-            assert(ci < num_cycles);
-            register_cycle(ci, ori);
-        }
-    };
-
-    std::function<void(Index, bool)> grow_polyhedron;
-    grow_polyhedron = [&](Index cycle_id, bool ori) {
-        assert(!involved[cycle_id]);
-        involved[cycle_id] = true;
-        polyhedra.push_back(signed_index(cycle_id, ori));
-
-        Index cycle_begin = contour_cycle_indices[cycle_id];
-        Index cycle_end = contour_cycle_indices[cycle_id + 1];
-        for (Index ci = cycle_begin; ci < cycle_end; ci++) {
-            SignedIndex si = contour_cycles[ci];
-            Index seg_id = index(si);
-            Index seg_ori = orientation(si);
-            if (seg_ori == ori) {
-                assert(positive_segment_map[seg_id] != invalid_signed_index);
-                assert(index(positive_segment_map[seg_id]) == cycle_id);
-                assert(positive_segment_map[seg_id] == signed_index(cycle_id, ori));
-                SignedIndex adj_cycle = negative_segment_map[seg_id];
-                assert(adj_cycle != invalid_signed_index);
-                Index adj_cycle_id = index(adj_cycle);
-                bool adj_cycle_ori = orientation(adj_cycle);
-
-                if (!involved[adj_cycle_id]) {
-                    grow_polyhedron(adj_cycle_id, adj_cycle_ori);
-                }
-            } else {
-                assert(negative_segment_map[seg_id] != invalid_signed_index);
-                assert(index(negative_segment_map[seg_id]) == cycle_id);
-                assert(negative_segment_map[seg_id] == signed_index(cycle_id, ori));
-                SignedIndex adj_cycle = positive_segment_map[seg_id];
-                assert(adj_cycle != invalid_signed_index);
-                Index adj_cycle_id = index(adj_cycle);
-                bool adj_cycle_ori = orientation(adj_cycle);
-
-                if (!involved[adj_cycle_id]) {
-                    grow_polyhedron(adj_cycle_id, adj_cycle_ori);
-                }
-            }
-        }
-    };
-
-    auto extract_components = [&](Index cycle_index_begin, Index cycle_index_end, bool ori) {
-        for (Index ci = cycle_index_begin; ci < cycle_index_end; ci++) {
-            if (!involved[ci]) {
-                grow_polyhedron(ci, ori);
-                polyhedron_indices.push_back(static_cast<Index>(polyhedra.size()));
-            }
+        for (Index ci = cycles_begin; ci < cycles_end; ci++) {
+            component_engine.register_cycle(signed_index(ci, ori));
         }
     };
 
     auto compute_components =
         [&](SignedIndex t021, SignedIndex t123, SignedIndex t013, SignedIndex t032) {
+            component_engine.clear();
+
             Index t021_id = index(t021);
             Index t123_id = index(t123);
             Index t013_id = index(t013);
@@ -450,21 +358,12 @@ extract_contour_polyhedra(
             Index cycles_032_begin = contour_cycle_triangle_indices[t032_id];
             Index cycles_032_end = contour_cycle_triangle_indices[t032_id + 1];
 
-            clear_register_cycles(cycles_021_begin, cycles_021_end);
-            clear_register_cycles(cycles_123_begin, cycles_123_end);
-            clear_register_cycles(cycles_013_begin, cycles_013_end);
-            clear_register_cycles(cycles_032_begin, cycles_032_end);
-
             register_cycles(cycles_021_begin, cycles_021_end, t021_ori);
             register_cycles(cycles_123_begin, cycles_123_end, t123_ori);
             register_cycles(cycles_013_begin, cycles_013_end, t013_ori);
             register_cycles(cycles_032_begin, cycles_032_end, t032_ori);
 
-            extract_components(cycles_021_begin, cycles_021_end, t021_ori);
-            extract_components(cycles_123_begin, cycles_123_end, t123_ori);
-            extract_components(cycles_013_begin, cycles_013_end, t013_ori);
-            extract_components(cycles_032_begin, cycles_032_end, t032_ori);
-
+            component_engine.extract_components(polyhedra, polyhedron_indices);
             polyhedron_tet_indices.push_back(static_cast<Index>(polyhedron_indices.size() - 1));
         };
 
