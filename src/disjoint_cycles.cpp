@@ -1,19 +1,23 @@
 #include <mtetcol/disjoint_cycles.h>
 
 #include <cassert>
+#include <stdexcept>
 
 namespace mtetcol {
 
-bool DisjointCycles::check_segments() const
+void DisjointCycles::check_segments() const
 {
+    if (m_segments.size() % 2 != 0) {
+        throw std::invalid_argument("Size of segments array must be even");
+    }
+
     size_t num_vertices = m_next_index.size();
     for (auto vi : m_segments) {
         assert(static_cast<size_t>(vi) < num_vertices);
         if (static_cast<size_t>(vi) >= num_vertices) {
-            return false;
+            throw std::invalid_argument("Vertex index out of bounds");
         }
     }
-    return true;
 }
 
 void DisjointCycles::clear()

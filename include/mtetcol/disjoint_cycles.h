@@ -5,7 +5,7 @@
 #include <SmallVector.h>
 
 #include <span>
-#include <stdexcept>
+#include <vector>
 
 namespace mtetcol {
 
@@ -22,10 +22,7 @@ public:
         : m_next_index(num_vertices, invalid_signed_index)
         , m_segments(segments)
     {
-        if (m_segments.size() % 2 != 0) {
-            throw std::invalid_argument("Size of segments array must be even");
-        }
-        assert(check_segments());
+        check_segments();
     }
 
     /**
@@ -53,9 +50,9 @@ private:
     /**
      * @brief Checks if the segments are valid.
      *
-     * @return True if all segments are valid, false otherwise.
+     * @throws std::invalid_argument if the segments are not valid.
      */
-    bool check_segments() const;
+    void check_segments() const;
 
 private:
     std::vector<SignedIndex> m_next_index;
