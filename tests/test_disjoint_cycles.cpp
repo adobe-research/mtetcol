@@ -1,10 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <chain_cycles.h>
+#include <disjoint_cycles.h>
 
 #include <vector>
 
-TEST_CASE("cycles", "[mtetcol]")
+TEST_CASE("disjoint_cycles", "[mtetcol]")
 {
     using Index = mtetcol::Index;
     using Scalar = mtetcol::Scalar;
@@ -22,7 +22,7 @@ TEST_CASE("cycles", "[mtetcol]")
     };
     // clang-format on
 
-    mtetcol::Cycles cycles(7, segments);
+    mtetcol::DisjointCycles cycles(7, segments);
     std::vector<SignedIndex> cycle_segments;
     std::vector<Index> cycle_indices;
     cycle_indices.push_back(0);

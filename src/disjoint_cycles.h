@@ -9,16 +9,16 @@
 
 namespace mtetcol {
 
-class Cycles
+class DisjointCycles
 {
 public:
     /**
-     * @brief Constructs a Cycles object with the given number of vertices and segments.
+     * @brief Constructs a DisjointCycles object with the given number of vertices and segments.
      *
      * @param num_vertices The number of vertices in the contour.
      * @param segments A Nx2 span of vertex indices representing the segments.
      */
-    Cycles(size_t num_vertices, std::span<const Index> segments)
+    DisjointCycles(size_t num_vertices, std::span<const Index> segments)
         : m_next_index(num_vertices, invalid_signed_index)
         , m_segments(segments)
     {

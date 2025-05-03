@@ -1,10 +1,10 @@
-#include "chain_cycles.h"
+#include "disjoint_cycles.h"
 
 #include <cassert>
 
 namespace mtetcol {
 
-bool Cycles::check_segments() const
+bool DisjointCycles::check_segments() const
 {
     size_t num_vertices = m_next_index.size();
     for (auto vi : m_segments) {
@@ -16,7 +16,7 @@ bool Cycles::check_segments() const
     return true;
 }
 
-void Cycles::clear()
+void DisjointCycles::clear()
 {
     assert(m_segments.size() % 2 == 0);
     const size_t num_segments = m_segments.size() / 2;
@@ -32,7 +32,7 @@ void Cycles::clear()
     m_active_segments.clear();
 }
 
-void Cycles::extract_cycles(std::vector<SignedIndex>& cycles, std::vector<Index>& cycle_indices)
+void DisjointCycles::extract_cycles(std::vector<SignedIndex>& cycles, std::vector<Index>& cycle_indices)
 {
     if (cycle_indices.empty() || cycle_indices.back() != cycles.size()) {
         throw std::invalid_argument("Cycle indices must be non-empty end with the size of cycles");
