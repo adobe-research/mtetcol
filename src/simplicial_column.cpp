@@ -182,8 +182,56 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
 template <>
 Contour<3> SimplicialColumn<3>::extract_contour(Scalar value, bool cyclic) const
 {
-    // TODO
-    return Contour<3>();
+    auto [contour_times, contour_time_indices, initial_signs] = extract_contour_vertices(
+        m_time_samples,
+        m_function_values,
+        m_vertex_start_indices,
+        value,
+        cyclic);
+
+    auto [contour_segments, contour_segment_indices] = extract_contour_segments(
+        contour_times,
+        contour_time_indices,
+        initial_signs,
+        m_edges,
+        cyclic);
+
+    auto [contour_cycles, contour_cycle_indices, contour_cycle_triangle_indices] =
+        extract_contour_cycles(
+            contour_times.size(),
+            contour_segments,
+            contour_segment_indices,
+            m_edges,
+            m_triangles);
+    assert(contour_cycle_triangle_indices.back() == contour_cycle_indices.size() - 1);
+    assert(contour_cycle_indices.back() == contour_cycles.size());
+
+    Contour<3> contour;
+
+    size_t num_contour_vertices = contour_time_indices.size() - 1;
+    for (size_t i = 0; i < num_contour_vertices; i++) {
+        std::span<Scalar> position = m_vertices.subspan(i * 3, 3);
+        std::span<Scalar> time_samples(
+            contour_times.data() + contour_time_indices[i],
+            contour_time_indices[i + 1] - contour_time_indices[i]);
+        for (auto t : time_samples) {
+            contour.add_vertex({position[0], position[1], t});
+        }
+    }
+
+    size_t num_segments = contour_segments.size() / 2;
+    for (size_t i = 0; i < num_segments; i++) {
+        contour.add_segment(contour_segments[i * 2], contour_segments[i * 2 + 1]);
+    }
+
+    size_t num_cycles = contour_cycle_indices.size() - 1;
+    for (size_t i = 0; i < num_cycles; i++) {
+        contour.add_cycle(std::span<SignedIndex>(
+            contour_cycles.data() + contour_cycle_indices[i],
+            contour_cycle_indices[i + 1] - contour_cycle_indices[i]));
+    }
+
+    return contour;
 }
 
 } // namespace mtetcol

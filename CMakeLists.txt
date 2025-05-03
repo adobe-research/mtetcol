@@ -18,10 +18,10 @@ target_include_directories(mtetcol PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 target_link_libraries(mtetcol
     PUBLIC
     strong_type::strong_type
+    smallvector::smallvector
     PRIVATE
     unordered_dense::unordered_dense
     spdlog::spdlog
-    smallvector::smallvector
 )
 
 add_library(mtetcol::mtetcol ALIAS mtetcol)

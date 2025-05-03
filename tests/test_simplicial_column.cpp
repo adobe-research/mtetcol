@@ -1,5 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <vector>
+#include <array>
+#include <cmath>
 
 #include <mtetcol/logger.h>
 #include <mtetcol/simplicial_column.h>
@@ -58,7 +61,7 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         constexpr Scalar offset = 0.1;
         const Scalar radius = 0.5;
         const Scalar theta = t * 2 * M_PI;
-        Scalar center[3] = {cos(theta) + offset, sin(theta) + offset, offset};
+        Scalar center[3] = {std::cos(theta) + offset, std::sin(theta) + offset, offset};
         Scalar d = std::sqrt(
             (x - center[0]) * (x - center[0]) + (y - center[1]) * (y - center[1]) +
             (z - center[2]) * (z - center[2]));
@@ -69,14 +72,14 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         constexpr Scalar offset = 0.1;
         const Scalar radius = 0.5;
         const Scalar theta = t * 2 * M_PI;
-        Scalar center[3] = {cos(theta) + offset, sin(theta) + offset, offset};
+        Scalar center[3] = {std::cos(theta) + offset, std::sin(theta) + offset, offset};
         Scalar d = std::sqrt(
             (x - center[0]) * (x - center[0]) + (y - center[1]) * (y - center[1]) +
             (z - center[2]) * (z - center[2]));
         if (d < 1e-12) return 0;
 
         Scalar spatial_grad[3] = {(x - center[0]) / d, (y - center[1]) / d, (z - center[2]) / d};
-        return (spatial_grad[0] * sin(theta) - spatial_grad[1] * cos(theta)) * 2 * M_PI;
+        return (spatial_grad[0] * std::sin(theta) - spatial_grad[1] * std::cos(theta)) * 2 * M_PI;
     };
 
     auto check_sphere_rotation_time_derivative = [&](Scalar x, Scalar y, Scalar z, Scalar t) {
@@ -117,20 +120,20 @@ TEST_CASE("simplicial_column", "[mtetcol]")
             std::span<Index>(start_indices.data(), start_indices.size()));
     };
 
-    auto check_contour = [&](mtetcol::Contour<4>& columns) {
-        size_t num_vertices = columns.get_num_vertices();
-        size_t num_segments = columns.get_num_segments();
-        size_t num_cycles = columns.get_num_cycles();
+    auto check_contour = [&](mtetcol::Contour<4>& contour) {
+        size_t num_vertices = contour.get_num_vertices();
+        size_t num_segments = contour.get_num_segments();
+        size_t num_cycles = contour.get_num_cycles();
 
         for (size_t si = 0; si < num_segments; si++) {
-            auto segment = columns.get_segment(si);
+            auto segment = contour.get_segment(si);
             REQUIRE(segment.size() == 2);
             REQUIRE(segment[0] < num_vertices);
             REQUIRE(segment[1] < num_vertices);
         }
 
         for (size_t ci = 0; ci < num_cycles; ci++) {
-            auto cycle = columns.get_cycle(ci);
+            auto cycle = contour.get_cycle(ci);
             size_t cycle_size = cycle.size();
             for (size_t i = 0; i < cycle_size; i++) {
                 SignedIndex curr_signed_si = cycle[i];
@@ -142,8 +145,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
                 bool curr_ori = orientation(curr_signed_si);
                 bool next_ori = orientation(next_signed_si);
 
-                auto curr_segment = columns.get_segment(curr_si);
-                auto next_segment = columns.get_segment(next_si);
+                auto curr_segment = contour.get_segment(curr_si);
+                auto next_segment = contour.get_segment(next_si);
 
                 Index v0 = curr_ori ? curr_segment[1] : curr_segment[0];
                 Index v1 = next_ori ? next_segment[0] : next_segment[1];
@@ -215,8 +218,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         // clang-format on
 
         mtetcol::SimplicialColumn<4> columns;
-        columns.set_vertices(vertices);
-        columns.set_simplices(tets);
+        columns.set_vertices(std::span<Scalar>(vertices, sizeof(vertices)/sizeof(Scalar)));
+        columns.set_simplices(std::span<Index>(tets, sizeof(tets)/sizeof(Index)));
 
         REQUIRE(columns.get_num_spatial_vertices() == 4);
         REQUIRE(columns.get_num_spatial_edges() == 6);
@@ -244,8 +247,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         // clang-format on
 
         mtetcol::SimplicialColumn<4> columns;
-        columns.set_vertices(vertices);
-        columns.set_simplices(tets);
+        columns.set_vertices(std::span<Scalar>(vertices, sizeof(vertices)/sizeof(Scalar)));
+        columns.set_simplices(std::span<Index>(tets, sizeof(tets)/sizeof(Index)));
 
         REQUIRE(columns.get_num_spatial_vertices() == 5);
         REQUIRE(columns.get_num_spatial_edges() == 9);
@@ -274,8 +277,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         // clang-format on
 
         mtetcol::SimplicialColumn<4> columns;
-        columns.set_vertices(vertices);
-        columns.set_simplices(tets);
+        columns.set_vertices(std::span<Scalar>(vertices, sizeof(vertices)/sizeof(Scalar)));
+        columns.set_simplices(std::span<Index>(tets, sizeof(tets)/sizeof(Index)));
 
         REQUIRE(columns.get_num_spatial_vertices() == 6);
         REQUIRE(columns.get_num_spatial_edges() == 11);
@@ -305,8 +308,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         // clang-format on
 
         mtetcol::SimplicialColumn<4> columns;
-        columns.set_vertices(vertices);
-        columns.set_simplices(tets);
+        columns.set_vertices(std::span<Scalar>(vertices, sizeof(vertices)/sizeof(Scalar)));
+        columns.set_simplices(std::span<Index>(tets, sizeof(tets)/sizeof(Index)));
 
         REQUIRE(columns.get_num_spatial_vertices() == 7);
         REQUIRE(columns.get_num_spatial_edges() == 12);
@@ -331,8 +334,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         // clang-format on
 
         mtetcol::SimplicialColumn<3> columns;
-        columns.set_vertices(vertices);
-        columns.set_simplices(tris);
+        columns.set_vertices(std::span<Scalar>(vertices, sizeof(vertices)/sizeof(Scalar)));
+        columns.set_simplices(std::span<Index>(tris, sizeof(tris)/sizeof(Index)));
 
         REQUIRE(columns.get_num_spatial_vertices() == 3);
         REQUIRE(columns.get_num_spatial_edges() == 3);
@@ -356,8 +359,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         // clang-format on
 
         mtetcol::SimplicialColumn<3> columns;
-        columns.set_vertices(vertices);
-        columns.set_simplices(tris);
+        columns.set_vertices(std::span<Scalar>(vertices, sizeof(vertices)/sizeof(Scalar)));
+        columns.set_simplices(std::span<Index>(tris, sizeof(tris)/sizeof(Index)));
 
         REQUIRE(columns.get_num_spatial_vertices() == 5);
         REQUIRE(columns.get_num_spatial_edges() == 6);
@@ -380,8 +383,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         // clang-format on
 
         mtetcol::SimplicialColumn<3> columns;
-        columns.set_vertices(vertices);
-        columns.set_simplices(tris);
+        columns.set_vertices(std::span<Scalar>(vertices, sizeof(vertices)/sizeof(Scalar)));
+        columns.set_simplices(std::span<Index>(tris, sizeof(tris)/sizeof(Index)));
 
         REQUIRE(columns.get_num_spatial_vertices() == 4);
         REQUIRE(columns.get_num_spatial_edges() == 5);
