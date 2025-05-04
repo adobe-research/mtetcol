@@ -138,6 +138,29 @@ TEST_CASE("contour", "[mtetcol]")
         REQUIRE(contour.get_num_segments() == 18);
         REQUIRE(contour.get_num_cycles() == 12);
         REQUIRE(contour.get_num_polyhedra() == 1);
+
+        SECTION("Isocontour: single corner")
+        {
+            std::vector<mtetcol::Scalar> function_values = { -1, 1, 1, 1, 1, 1, 1, 1 };
+            auto isocontour = contour.isocontour(function_values);
+            REQUIRE(isocontour.get_num_cycles() == 1);
+        }
+
+        SECTION("Isocontour: two corners")
+        {
+            std::vector<mtetcol::Scalar> function_values = { -1, 1, -1, 1, 1, 1, 1, 1 };
+            auto isocontour = contour.isocontour(function_values);
+            REQUIRE(isocontour.get_num_cycles() == 2);
+        }
+
+        SECTION("Isocontour: top")
+        {
+            std::vector<mtetcol::Scalar> function_values = { -1, -1, -1, -1, 1, 1, 1, 1 };
+            auto isocontour = contour.isocontour(function_values);
+            REQUIRE(isocontour.get_num_cycles() == 1);
+            REQUIRE(isocontour.get_num_segments() == 8);
+            REQUIRE(isocontour.get_num_vertices() == 8);
+        }
     }
 
     SECTION("3D square")

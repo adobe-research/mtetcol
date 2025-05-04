@@ -1,4 +1,5 @@
 #include <mtetcol/contour.h>
+#include <mtetcol/disjoint_cycles.h>
 
 #include <SmallVector.h>
 
@@ -268,8 +269,25 @@ Contour<4> Contour<4>::isocontour(std::span<Scalar> function_values) const
     std::vector<Index> zero_crossing_vertices =
         compute_zero_crossing_vertices(*this, function_values, result);
 
-    auto zero_crossing_segment_indices =
+    std::vector<Index> zero_crossing_segment_indices =
         compute_zero_crossing_segments(*this, function_values, zero_crossing_vertices, result);
+
+    size_t num_polyhedra = get_num_polyhedra();
+    DisjointCycles disjoint_cycles(result.get_num_vertices(), result.m_segments);
+    for (size_t i = 0; i < num_polyhedra; i++) {
+        disjoint_cycles.clear();
+        auto polyhedron = get_polyhedron(i);
+        for (auto cid : polyhedron) {
+            Index seg_start = zero_crossing_segment_indices[index(cid)];
+            Index seg_end = zero_crossing_segment_indices[index(cid) + 1];
+
+            for (Index seg_id = seg_start; seg_id < seg_end; seg_id++) {
+                disjoint_cycles.register_segment(signed_index(seg_id, true));
+            }
+        }
+        disjoint_cycles.extract_cycles(result.m_cycles, result.m_cycle_start_indices);
+    }
+
     return result;
 }
 
