@@ -226,6 +226,20 @@ public:
         return m_polyhedron_start_indices.size() - 1;
     }
 
+    /**
+     * @brief Update the contour so that all cycles are triangles.
+     */
+    void triangulate_cycles();
+
+    /**
+     * @brief Compute the isocontour of this contour.
+     *
+     * @param function_values A span of function values at the vertices of the contour.
+     *
+     * @return A Contour object representing the isocontour.
+     */
+    Contour<dim> isocontour(std::span<Scalar> function_values) const;
+
 private:
     /**
      * @brief Check if the cycle is valid.
