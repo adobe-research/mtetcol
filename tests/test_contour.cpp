@@ -140,7 +140,7 @@ TEST_CASE("contour", "[mtetcol]")
         REQUIRE(contour.get_num_polyhedra() == 1);
     }
 
-    SECTION("3D")
+    SECTION("3D square")
     {
         mtetcol::Contour<3> contour;
         REQUIRE(contour.get_num_vertices() == 0);
@@ -168,5 +168,11 @@ TEST_CASE("contour", "[mtetcol]")
 
         contour.triangulate_cycles();
         REQUIRE(contour.get_num_cycles() == 2);
+
+
+        std::vector<mtetcol::Scalar> function_values = { -1, -1, 1, 1 };
+        auto isocontour = contour.isocontour(function_values);
+        assert(isocontour.get_num_vertices() == 3);
+        assert(isocontour.get_num_segments() == 2);
     }
 }

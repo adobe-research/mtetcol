@@ -1,5 +1,7 @@
 #include <mtetcol/contour.h>
 
+#include <SmallVector.h>
+
 namespace mtetcol {
 
 namespace {
@@ -94,6 +96,102 @@ std::vector<Index> triangulate(
     return cycle_to_triangle_map;
 }
 
+template <int dim>
+std::vector<Index> compute_zero_crossing_vertices(
+    const Contour<dim>& contour,
+    std::span<const Scalar> function_values,
+    Contour<dim>& result)
+{
+    static_assert(dim == 3 || dim == 4, "dim must be 3 or 4");
+    size_t num_segments = contour.get_num_segments();
+    std::vector<Index> zero_crossing_vertices(num_segments, invalid_index);
+
+    auto interpolate_segment = [&](Index v0, Index v1) {
+        Scalar t = function_values[v0] / (function_values[v0] - function_values[v1]);
+        auto pos0 = contour.get_vertex(v0);
+        auto pos1 = contour.get_vertex(v1);
+        if constexpr (dim == 3) {
+            result.add_vertex(
+                {pos0[0] + t * (pos1[0] - pos0[0]),
+                 pos0[1] + t * (pos1[1] - pos0[1]),
+                 pos0[2] + t * (pos1[2] - pos0[2])});
+        } else if constexpr (dim == 4) {
+            result.add_vertex(
+                {pos0[0] + t * (pos1[0] - pos0[0]),
+                 pos0[1] + t * (pos1[1] - pos0[1]),
+                 pos0[2] + t * (pos1[2] - pos0[2]),
+                 pos0[2] + t * (pos1[3] - pos0[3])});
+        }
+        return static_cast<Index>(result.get_num_vertices() - 1);
+    };
+
+    for (size_t i = 0; i < num_segments; i++) {
+        auto seg = contour.get_segment(i);
+        Index v0 = seg[0];
+        Index v1 = seg[1];
+        if (function_values[v0] >= 0 && function_values[v1] < 0 ||
+            function_values[v0] < 0 && function_values[v1] >= 0) {
+            zero_crossing_vertices[i] = interpolate_segment(v0, v1);
+        }
+    }
+
+    return zero_crossing_vertices;
+}
+
+template <int dim>
+std::vector<Index> compute_zero_crossing_segments(
+    const Contour<dim>& contour,
+    std::span<const Scalar> function_values,
+    const std::vector<Index>& zero_crossing_vertices,
+    Contour<dim>& result)
+{
+    static_assert(dim == 3 || dim == 4, "dim must be 3 or 4");
+    size_t num_cycles = contour.get_num_cycles();
+    llvm_vecsmall::SmallVector<SignedIndex, 4> zero_crossing_segments;
+    std::vector<Index> zero_crossing_segment_indices;
+    zero_crossing_segment_indices.reserve(num_cycles + 1);
+    zero_crossing_segment_indices.push_back(0);
+
+    for (size_t i = 0; i < num_cycles; i++) {
+        auto cycle = contour.get_cycle(i);
+        size_t cycle_size = cycle.size();
+        zero_crossing_segments.clear();
+
+        for (SignedIndex sid : cycle) {
+            Index seg_id = index(sid);
+            if (zero_crossing_vertices[seg_id] != invalid_index) {
+                zero_crossing_segments.push_back(sid);
+                if (zero_crossing_segments.size() > 2) {
+                    throw std::runtime_error("Cycle has more than 2 zero crossings, please call "
+                                             "triangulate_cycles() first");
+                }
+            }
+        }
+        if (!zero_crossing_segments.empty()) {
+            // Determine segment orientation
+            assert(zero_crossing_segments.size() == 2);
+            auto seg_id_0 = index(zero_crossing_segments[0]);
+            bool seg_ori_0 = orientation(zero_crossing_segments[0]);
+            auto seg_id_1 = index(zero_crossing_segments[1]);
+            bool seg_ori_1 = orientation(zero_crossing_segments[1]);
+
+            Index v0 = contour.get_segment(seg_id_0)[seg_ori_0 ? 0 : 1];
+            if (function_values[v0] < 0) {
+                result.add_segment(
+                    zero_crossing_vertices[seg_id_1],
+                    zero_crossing_vertices[seg_id_0]);
+            } else {
+                result.add_segment(
+                    zero_crossing_vertices[seg_id_0],
+                    zero_crossing_vertices[seg_id_1]);
+            }
+        }
+        zero_crossing_segment_indices.push_back(result.get_num_segments());
+    }
+    return zero_crossing_segment_indices;
+}
+
+
 } // namespace
 
 template <>
@@ -151,15 +249,28 @@ void Contour<4>::triangulate_cycles()
 template <>
 Contour<3> Contour<3>::isocontour(std::span<Scalar> function_values) const
 {
-    // TODO
-    return Contour<3>();
+    assert(get_num_vertices() == function_values.size());
+    Contour<3> result;
+
+    std::vector<Index> zero_crossing_vertices =
+        compute_zero_crossing_vertices(*this, function_values, result);
+
+    compute_zero_crossing_segments(*this, function_values, zero_crossing_vertices, result);
+    return result;
 }
 
 template <>
 Contour<4> Contour<4>::isocontour(std::span<Scalar> function_values) const
 {
-    // TODO
-    return Contour<4>();
+    assert(get_num_vertices() == function_values.size());
+    Contour<4> result;
+
+    std::vector<Index> zero_crossing_vertices =
+        compute_zero_crossing_vertices(*this, function_values, result);
+
+    auto zero_crossing_segment_indices =
+        compute_zero_crossing_segments(*this, function_values, zero_crossing_vertices, result);
+    return result;
 }
 
 } // namespace mtetcol
