@@ -1,4 +1,5 @@
 #include <mtetcol/disjoint_components.h>
+#include <mtetcol/logger.h>
 
 #include <cassert>
 #include <functional>
@@ -32,9 +33,17 @@ void DisjointComponents::extract_components(
     for (auto cid : m_active_cycles) {
         Index cycle_id = index(cid);
         bool cycle_ori = orientation(cid);
+        logger().trace("Cycle id: {}, orientation: {}", cycle_id, cycle_ori);
 
         Index cycle_begin = m_cycle_indices[cycle_id];
         Index cycle_end = m_cycle_indices[cycle_id + 1];
+        if (cycle_end == cycle_begin + 2) {
+            // 2 segment cycle (i.e. bubble), skipping
+            SignedIndex si0 = m_cycles[cycle_begin];
+            SignedIndex si1 = m_cycles[cycle_begin + 1];
+            assert(si0 == -si1);
+            continue;
+        }
         for (Index i = cycle_begin; i < cycle_end; i++) {
             SignedIndex si = m_cycles[i];
             Index seg_id = index(si);
@@ -44,9 +53,17 @@ void DisjointComponents::extract_components(
             if (cycle_ori == seg_ori) {
                 assert(m_positive_segment_map[seg_id] == invalid_signed_index);
                 m_positive_segment_map[seg_id] = signed_index(cycle_id, cycle_ori);
+                logger().trace(
+                    "Positive segment map: {} -> {}",
+                    seg_id,
+                    value_of(signed_index(cycle_id, cycle_ori)));
             } else {
                 assert(m_negative_segment_map[seg_id] == invalid_signed_index);
                 m_negative_segment_map[seg_id] = signed_index(cycle_id, cycle_ori);
+                logger().trace(
+                    "Negative segment map: {} -> {}",
+                    seg_id,
+                    value_of(signed_index(cycle_id, cycle_ori)));
             }
         }
     }
@@ -65,6 +82,10 @@ void DisjointComponents::extract_components(
 
         Index cycle_begin = m_cycle_indices[cycle_id];
         Index cycle_end = m_cycle_indices[cycle_id + 1];
+        if (cycle_end == cycle_begin + 2) {
+            // 2 segment cycle (i.e. bubble), skipping
+            return;
+        }
         for (Index i = cycle_begin; i < cycle_end; i++) {
             SignedIndex si = m_cycles[i];
             Index seg_id = index(si);

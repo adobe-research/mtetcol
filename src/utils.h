@@ -1,12 +1,12 @@
 #pragma once
 
 #include <mtetcol/common.h>
-#include <mtetcol/simplicial_column.h>
 #include <mtetcol/logger.h>
+#include <mtetcol/simplicial_column.h>
 
 #include <span>
-#include <vector>
 #include <tuple>
+#include <vector>
 
 namespace mtetcol {
 
@@ -126,10 +126,10 @@ bool check_tetrahedra(const SimplicialColumn<dim>& columns)
 
 /**
  * @brief Extracts zero-crossing times from a vertex's time series data.
- * 
+ *
  * This function finds all points in time where a function's value crosses a given threshold.
  * It supports both cyclic and non-cyclic time series data.
- * 
+ *
  * @param time_samples A span of time points, must start at 0 and end at 1
  * @param function_values A span of function values corresponding to the time points
  * @param value The threshold value to detect crossings
@@ -146,10 +146,10 @@ void extract_vertex_zero_crossing(
 
 /**
  * @brief Extracts contour vertices from a set of time series data.
- * 
+ *
  * This function processes multiple vertices' time series data to find contour vertices
  * where the function values cross a given threshold. It handles both cyclic and non-cyclic data.
- * 
+ *
  * @param time_samples Vector of time points for all vertices
  * @param function_values Vector of function values for all vertices
  * @param vertex_start_indices Indices marking the start of each vertex's data
@@ -179,9 +179,11 @@ std::tuple<std::vector<Scalar>, std::vector<size_t>, std::vector<bool>> extract_
  *
  * @return A tuple containing:
  * - A vector of contour segments. (Each segment is represented by two consecutive indices.)
- * - A vector of indices separating the contour segments of each spatial edge.
+ * - A vector of oriented contour segment indices over each edge relative to the edge orinetation.
+ * - A vector of indices separating the contour segments over edges of each spatial edge.
  */
-std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
+std::tuple<std::vector<Index>, std::vector<SignedIndex>, std::vector<Index>>
+extract_contour_segments(
     const std::vector<Scalar>& contour_times,
     const std::vector<size_t>& contour_time_indices,
     const std::vector<bool>& initial_signs,
@@ -193,7 +195,9 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
  *
  * @param num_contour_vertices The number of contour vertices.
  * @param contour_segments The contour segments.
- * @param contour_segment_indices Indices separating the contour segments of each spatial edge.
+ * @param contour_segment_over_edges The oriented contour segment indices over each edge.
+ * @param contour_segment_over_edges_indices Indices separating the contour segments over edges of
+ * each spatial edge.
  * @param edges The spatial edges of the simplicial column.
  * @param triangles The spatial triangles of the simplicial column.
  *
@@ -205,7 +209,8 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
 std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> extract_contour_cycles(
     const size_t num_contour_vertices,
     const std::vector<Index>& contour_segments,
-    const std::vector<Index>& contour_segment_indices,
+    const std::vector<SignedIndex>& contour_segment_over_edges,
+    const std::vector<Index>& contour_segment_over_edges_indices,
     const std::vector<Index>& edges,
     const std::vector<SignedIndex>& triangles);
 

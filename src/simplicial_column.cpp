@@ -1,5 +1,5 @@
-#include <mtetcol/simplicial_column.h>
 #include <mtetcol/logger.h>
+#include <mtetcol/simplicial_column.h>
 
 #include "hashmap.h"
 #include "utils.h"
@@ -119,18 +119,20 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
         value,
         cyclic);
 
-    auto [contour_segments, contour_segment_indices] = extract_contour_segments(
-        contour_times,
-        contour_time_indices,
-        initial_signs,
-        m_edges,
-        cyclic);
+    auto [contour_segments, contour_segment_on_edges, contour_segment_on_edges_indices] =
+        extract_contour_segments(
+            contour_times,
+            contour_time_indices,
+            initial_signs,
+            m_edges,
+            cyclic);
 
     auto [contour_cycles, contour_cycle_indices, contour_cycle_triangle_indices] =
         extract_contour_cycles(
             contour_times.size(),
             contour_segments,
-            contour_segment_indices,
+            contour_segment_on_edges,
+            contour_segment_on_edges_indices,
             m_edges,
             m_triangles);
     assert(contour_cycle_triangle_indices.back() == contour_cycle_indices.size() - 1);
@@ -189,18 +191,20 @@ Contour<3> SimplicialColumn<3>::extract_contour(Scalar value, bool cyclic) const
         value,
         cyclic);
 
-    auto [contour_segments, contour_segment_indices] = extract_contour_segments(
-        contour_times,
-        contour_time_indices,
-        initial_signs,
-        m_edges,
-        cyclic);
+    auto [contour_segments, contour_segment_on_edges, contour_segment_on_edges_indices] =
+        extract_contour_segments(
+            contour_times,
+            contour_time_indices,
+            initial_signs,
+            m_edges,
+            cyclic);
 
     auto [contour_cycles, contour_cycle_indices, contour_cycle_triangle_indices] =
         extract_contour_cycles(
             contour_times.size(),
             contour_segments,
-            contour_segment_indices,
+            contour_segment_on_edges,
+            contour_segment_on_edges_indices,
             m_edges,
             m_triangles);
     assert(contour_cycle_triangle_indices.back() == contour_cycle_indices.size() - 1);

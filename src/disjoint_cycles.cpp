@@ -1,4 +1,5 @@
 #include <mtetcol/disjoint_cycles.h>
+#include <mtetcol/logger.h>
 
 #include <cassert>
 #include <stdexcept>

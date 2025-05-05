@@ -71,6 +71,13 @@ public:
      */
     void extract_cycles(std::vector<SignedIndex>& cycles, std::vector<Index>& cycle_indices);
 
+    /**
+     * @brief Returns the number of registered segments.
+     *
+     * @return The number of currently registered segments.
+     */
+    size_t num_registered_segments() const { return m_active_segments.size(); }
+
 private:
     /**
      * @brief Checks if the segments are valid.

@@ -35,7 +35,7 @@ void save_contour(std::string_view filename, const Contour<4>& contour)
 
             auto seg = contour.get_segment(seg_id);
 
-            fout << (seg_ori ? seg[0] : seg[1]) << " ";
+            fout << (seg_ori ? seg[0] : seg[1]) + 1 << " ";
         }
         fout << std::endl;
     }

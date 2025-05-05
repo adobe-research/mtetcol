@@ -121,7 +121,8 @@ std::tuple<std::vector<Scalar>, std::vector<size_t>, std::vector<bool>> extract_
         std::move(initial_signs)};
 }
 
-std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
+std::tuple<std::vector<Index>, std::vector<SignedIndex>, std::vector<Index>>
+extract_contour_segments(
     const std::vector<Scalar>& contour_times,
     const std::vector<size_t>& contour_time_indices,
     const std::vector<bool>& initial_signs,
@@ -130,10 +131,14 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
 {
     size_t num_edges = edges.size() / 2;
 
+    EdgeMap vertical_edge_map;
     std::vector<Index> segments;
-    std::vector<Index> segment_indices;
-    segment_indices.reserve(num_edges + 1);
-    segment_indices.push_back(0);
+    std::vector<SignedIndex> segment_on_edges;
+    std::vector<Index> segment_on_edges_indices;
+    segments.reserve(contour_times.size() * 2);
+    segment_on_edges.reserve(contour_times.size()); // Just a guess
+    segment_on_edges_indices.reserve(num_edges + 1);
+    segment_on_edges_indices.push_back(0);
 
     struct LocalIndex
     {
@@ -174,8 +179,7 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
     };
 
 
-    //llvm_vecsmall::SmallVector<LocalIndex, 1024> local_indices;
-    std::vector<LocalIndex> local_indices;
+    llvm_vecsmall::SmallVector<LocalIndex, 1024> local_indices;
     for (size_t ei = 0; ei < num_edges; ei++) {
         Index v0 = edges[ei * 2];
         Index v1 = edges[ei * 2 + 1];
@@ -219,6 +223,17 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
             }
         }
 
+        auto add_segment = [&](Index v0, Index v1) -> Index {
+            if (v0 < v1) {
+                segments.push_back(v0);
+                segments.push_back(v1);
+            } else {
+                segments.push_back(v1);
+                segments.push_back(v0);
+            }
+            return static_cast<Index>(segments.size() / 2 - 1);
+        };
+
         size_t num_segments = local_indices.size() / 2;
         for (size_t si = 0; si < num_segments; si++) {
             const auto& lid0 = local_indices[(si * 2 + offset) % local_indices.size()];
@@ -226,32 +241,48 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
 
             Index p0 = contour_time_indices[lid0.vertex_index] + lid0.time_index;
             Index p1 = contour_time_indices[lid1.vertex_index] + lid1.time_index;
-            if ((p0 == 4 && p1 == 5) || (p0 == 5 && p1 == 4)) {
-                logger().debug("ei: {}, p0: {}, p1: {}", ei, p0, p1);
-            }
+            Index seg_id = invalid_index;
+            bool seg_ori = true;
 
+            // Add segment
+            if (lid0.vertex_index == lid1.vertex_index) {
+                // Vertical segment on the same vertex
+                if (vertical_edge_map.contains({p0, p1})) {
+                    seg_id = vertical_edge_map[{p0, p1}];
+                } else {
+                    vertical_edge_map[{p0, p1}] = segments.size() / 2;
+                    seg_id = add_segment(p0, p1);
+                }
+            } else {
+                // cross edge
+                seg_id = add_segment(p0, p1);
+            }
+            assert(seg_id != invalid_index);
+
+            // Compute segment orientation
             // Pair local indices up based on even/odd parity.
             if ((lid0.vertex_index == v0 && lid0.time_index % 2 == parity) ||
                 (lid0.vertex_index == v1 && lid0.time_index % 2 != parity)) {
                 // lid0 -> lid1
-                segments.push_back(contour_time_indices[lid0.vertex_index] + lid0.time_index);
-                segments.push_back(contour_time_indices[lid1.vertex_index] + lid1.time_index);
+                seg_ori = p0 < p1;
             } else {
                 // lid1 -> lid0
-                segments.push_back(contour_time_indices[lid1.vertex_index] + lid1.time_index);
-                segments.push_back(contour_time_indices[lid0.vertex_index] + lid0.time_index);
+                seg_ori = p1 < p0;
             }
+
+            segment_on_edges.push_back(signed_index(seg_id, seg_ori));
         }
-        segment_indices.push_back(static_cast<Index>(segments.size()));
+        segment_on_edges_indices.push_back(static_cast<Index>(segment_on_edges.size()));
     }
 
-    return {std::move(segments), std::move(segment_indices)};
+    return {std::move(segments), std::move(segment_on_edges), std::move(segment_on_edges_indices)};
 }
 
 std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> extract_contour_cycles(
     const size_t num_contour_vertices,
     const std::vector<Index>& contour_segments,
-    const std::vector<Index>& contour_segment_indices,
+    const std::vector<SignedIndex>& contour_segment_on_edges,
+    const std::vector<Index>& contour_segment_on_edges_indices,
     const std::vector<Index>& edges,
     const std::vector<SignedIndex>& triangles)
 {
@@ -265,14 +296,13 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
     DisjointCycles cycle_engine(num_contour_vertices, contour_segments);
 
     auto register_edge = [&](Index e_id, bool ori) {
-        Index seg_begin = contour_segment_indices[e_id];
-        Index seg_end = contour_segment_indices[e_id + 1];
+        Index seg_begin = contour_segment_on_edges_indices[e_id];
+        Index seg_end = contour_segment_on_edges_indices[e_id + 1];
         assert(seg_begin < seg_end);
-        assert((seg_end - seg_begin) % 2 == 0);
 
-        for (Index i = seg_begin; i < seg_end; i += 2) {
-            Index seg_id = i / 2;
-            SignedIndex si = signed_index(seg_id, ori);
+        for (Index i = seg_begin; i < seg_end; i++) {
+            SignedIndex si = contour_segment_on_edges[i];
+            if (!ori) si = -si;
             cycle_engine.register_segment(si);
         }
     };
@@ -327,7 +357,10 @@ extract_contour_polyhedra(
     polyhedron_indices.push_back(0);
     polyhedron_tet_indices.push_back(0);
 
-    DisjointComponents component_engine(num_contour_segments, contour_cycles, contour_cycle_indices);
+    DisjointComponents component_engine(
+        num_contour_segments,
+        contour_cycles,
+        contour_cycle_indices);
 
     auto register_cycles = [&](Index cycles_begin, Index cycles_end, bool ori) {
         assert(cycles_begin < cycles_end);

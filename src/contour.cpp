@@ -97,13 +97,6 @@ std::vector<Index> triangulate(
                 }
                 assert(si_prev != invalid_signed_index);
                 assert(si_next != invalid_signed_index);
-                if (triangle_cycle_indices.size() - 1 == 58) {
-                    logger().debug(
-                        "Adding triangle: {} {} {}",
-                        value_of(si_prev),
-                        value_of(si_curr),
-                        value_of(si_next));
-                }
                 triangle_cycles.push_back(si_prev);
                 triangle_cycles.push_back(si_curr);
                 triangle_cycles.push_back(si_next);
@@ -237,13 +230,6 @@ void Contour<4>::triangulate_cycles()
     check_all_cycles();
     check_all_polyhedra();
 
-    {
-        auto p0 = get_vertex(4);
-        auto p1 = get_vertex(5);
-        logger().debug("v4: {} {} {} {}", p0[0], p0[1], p0[2], p0[3]);
-        logger().debug("v5: {} {} {} {}", p1[0], p1[1], p1[2], p1[3]);
-    }
-    print_polyhedron(*this, 16);
     auto cycle_to_triangle_map = triangulate(m_segments, m_cycles, m_cycle_start_indices);
     check_all_cycles();
 
@@ -275,7 +261,6 @@ void Contour<4>::triangulate_cycles()
     std::swap(m_polyhedra, updated_polyhedra);
     std::swap(m_polyhedron_start_indices, updated_polyhedron_start_indices);
 
-    print_polyhedron(*this, 16);
     num_polyhedra = get_num_polyhedra();
     for (size_t i = 0; i < num_polyhedra; i++) {
         check_polyhedron(i);
@@ -315,9 +300,10 @@ Contour<4> Contour<4>::isocontour(std::span<Scalar> function_values) const
         for (auto cid : polyhedron) {
             Index seg_start = zero_crossing_segment_indices[index(cid)];
             Index seg_end = zero_crossing_segment_indices[index(cid) + 1];
+            bool cycle_ori = orientation(cid);
 
             for (Index seg_id = seg_start; seg_id < seg_end; seg_id++) {
-                disjoint_cycles.register_segment(signed_index(seg_id, true));
+                disjoint_cycles.register_segment(signed_index(seg_id, cycle_ori));
             }
         }
         disjoint_cycles.extract_cycles(result.m_cycles, result.m_cycle_start_indices);
