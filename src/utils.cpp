@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "hashmap.h"
 
 #include <mtetcol/disjoint_components.h>
 #include <mtetcol/disjoint_cycles.h>
@@ -173,7 +174,8 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
     };
 
 
-    llvm_vecsmall::SmallVector<LocalIndex, 1024> local_indices;
+    //llvm_vecsmall::SmallVector<LocalIndex, 1024> local_indices;
+    std::vector<LocalIndex> local_indices;
     for (size_t ei = 0; ei < num_edges; ei++) {
         Index v0 = edges[ei * 2];
         Index v1 = edges[ei * 2 + 1];
@@ -221,6 +223,12 @@ std::tuple<std::vector<Index>, std::vector<Index>> extract_contour_segments(
         for (size_t si = 0; si < num_segments; si++) {
             const auto& lid0 = local_indices[(si * 2 + offset) % local_indices.size()];
             const auto& lid1 = local_indices[(si * 2 + 1 + offset) % local_indices.size()];
+
+            Index p0 = contour_time_indices[lid0.vertex_index] + lid0.time_index;
+            Index p1 = contour_time_indices[lid1.vertex_index] + lid1.time_index;
+            if ((p0 == 4 && p1 == 5) || (p0 == 5 && p1 == 4)) {
+                logger().debug("ei: {}, p0: {}, p1: {}", ei, p0, p1);
+            }
 
             // Pair local indices up based on even/odd parity.
             if ((lid0.vertex_index == v0 && lid0.time_index % 2 == parity) ||
@@ -272,7 +280,6 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
     assert(triangles.size() % 3 == 0);
     const size_t num_triangles = triangles.size() / 3;
     for (size_t ti = 0; ti < num_triangles; ti++) {
-        logger().debug("Triangle {}", ti);
         cycle_engine.clear();
 
         SignedIndex e01 = triangles[ti * 3];

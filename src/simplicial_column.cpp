@@ -210,7 +210,7 @@ Contour<3> SimplicialColumn<3>::extract_contour(Scalar value, bool cyclic) const
 
     size_t num_contour_vertices = contour_time_indices.size() - 1;
     for (size_t i = 0; i < num_contour_vertices; i++) {
-        std::span<Scalar> position = m_vertices.subspan(i * 3, 3);
+        std::span<Scalar> position = m_vertices.subspan(i * 2, 2);
         std::span<Scalar> time_samples(
             contour_times.data() + contour_time_indices[i],
             contour_time_indices[i + 1] - contour_time_indices[i]);

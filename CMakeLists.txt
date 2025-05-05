@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.28)
 project(mtetcol)
 
 option(MTETCOL_BUILD_TESTS "Build tests" OFF)
+option(MTETCOL_BUILD_EXAMPLE "Build example" OFF)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 include(strong_type)
@@ -30,6 +31,21 @@ set_target_properties(mtetcol PROPERTIES
     POSITION_INDEPENDENT_CODE ON
     COMPILE_WARNING_AS_ERROR ON
 )
+
+if (MTETCOL_BUILD_EXAMPLE)
+    include(mtet)
+    include(indirect-value-lite)
+    add_executable(sweep ${CMAKE_CURRENT_LIST_DIR}/example/sweep.cpp)
+    target_link_libraries(sweep
+        PRIVATE
+        mtetcol::mtetcol
+        spdlog::spdlog
+        mtet::mtet
+        unordered_dense::unordered_dense
+        nonstd::indirect-value-lite
+    )
+    target_compile_features(sweep PRIVATE cxx_std_20)
+endif()
 
 if(MTETCOL_BUILD_TESTS)
     include(CTest)

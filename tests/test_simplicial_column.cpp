@@ -390,4 +390,65 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         REQUIRE(columns.get_num_spatial_edges() == 5);
         REQUIRE(columns.get_num_spatial_triangles() == 2);
     }
+
+    SECTION("Bubble")
+    {
+        // clang-format off
+        Scalar vertices[] = {
+            0, 0,
+            1, 0,
+            0, 1,
+        };
+        Index tris[] = {
+            0, 1, 2,
+        };
+        // clang-format on
+
+        mtetcol::SimplicialColumn<3> columns;
+        columns.set_vertices(std::span<Scalar>(vertices, sizeof(vertices)/sizeof(Scalar)));
+        columns.set_simplices(std::span<Index>(tris, sizeof(tris)/sizeof(Index)));
+
+        REQUIRE(columns.get_num_spatial_vertices() == 3);
+        REQUIRE(columns.get_num_spatial_edges() == 3);
+        REQUIRE(columns.get_num_spatial_triangles() == 1);
+
+        std::vector<Scalar> time_samples = {0, 0.4, 0.5, 0.6, 1, 0, 1, 0, 1};
+        std::vector<Scalar> function_values = {1, 1, -1, 1, 1, 1, 1, 1, 1};
+        std::vector<Index> vertex_start_indices = {0, 5, 7, 9};
+        columns.set_time_samples(
+            std::span<Scalar>(time_samples.data(), time_samples.size()),
+            std::span<Scalar>(function_values.data(), function_values.size()),
+            std::span<Index>(vertex_start_indices.data(), vertex_start_indices.size()));
+
+        mtetcol::Contour<3> contour = columns.extract_contour(0, false);
+        {
+            mtetcol::logger().set_level(spdlog::level::debug);
+
+            size_t num_vertices = contour.get_num_vertices();
+            for (size_t i=0; i<num_vertices; i++) {
+                auto pos = contour.get_vertex(i);
+                mtetcol::logger().debug("Vertex {}: ({}, {})  t: {}", i, pos[0], pos[1], pos[2]);
+            }
+
+            size_t num_segments = contour.get_num_segments();
+            for (size_t i=0; i<num_segments; i++) {
+                auto segment = contour.get_segment(i);
+                mtetcol::logger().debug("Segment {}: ({}, {})", i, segment[0], segment[1]);
+            }
+
+            size_t num_cycles = contour.get_num_cycles();
+            for (size_t i=0; i<num_cycles; i++) {
+                auto cycle = contour.get_cycle(i);
+                std::string str = fmt::format("Cycle {}: ", i);
+                for (auto si : cycle) {
+                    str += fmt::format("{} ", value_of(si));
+                }
+                mtetcol::logger().debug("{}", str);
+            }
+
+            mtetcol::logger().set_level(spdlog::level::warn);
+        }
+        REQUIRE(contour.get_num_vertices() == 5);
+        REQUIRE(contour.get_num_segments() == 4);
+    }
 }

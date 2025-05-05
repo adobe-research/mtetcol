@@ -99,11 +99,8 @@ public:
             assert(times.size() == values.size());
             assert(times.size() > 0);
 
-            m_time_samples.insert(std::back_inserter(m_time_samples), times.begin(), times.end());
-            m_function_values.insert(
-                std::back_inserter(m_function_values),
-                values.begin(),
-                values.end());
+            m_time_samples.insert(m_time_samples.end(), times.begin(), times.end());
+            m_function_values.insert(m_function_values.end(), values.begin(), values.end());
             m_vertex_start_indices.push_back(m_time_samples.size());
         }
     }
@@ -133,6 +130,12 @@ public:
     [[nodiscard]] std::span<const Scalar> get_spatial_vertices() const
     {
         return std::span<const Scalar>(m_vertices.data(), m_vertices.size());
+    }
+
+    [[nodiscard]] std::span<const Scalar, dim - 1> get_spatial_vertex(Index vi) const
+    {
+        assert(m_vertices.size() % (dim - 1) == 0);
+        return std::span<const Scalar, dim - 1>(m_vertices.data() + vi * (dim - 1), (dim - 1));
     }
 
     /**

@@ -7,6 +7,25 @@ namespace mtetcol {
 
 namespace {
 
+void print_polyhedron(const Contour<4>& contour, Index polyhedron_id)
+{
+    logger().info("Polyhedron {}", polyhedron_id);
+    auto cycles = contour.get_polyhedron(polyhedron_id);
+    size_t cycle_size = cycles.size();
+    for (size_t i=0; i< cycle_size; i++) {
+        auto ci = cycles[i];
+        Index cycle_id = index(ci);
+        bool cycle_ori = orientation(ci);
+
+        auto cycle = contour.get_cycle(cycle_id);
+        std::string cycle_str;
+        for (auto si : cycle) {
+            cycle_str += std::to_string(value_of(si)) + " ";
+        }
+        logger().debug("Cycle {}: {}", i, cycle_str);
+    }
+}
+
 std::vector<Index> triangulate(
     std::vector<Index>& segments,
     std::vector<SignedIndex>& cycles,
@@ -68,10 +87,8 @@ std::vector<Index> triangulate(
 
                     si_prev = cycle[0];
                     si_next = signed_index(segments.size() / 2 - 1, false);
-
                 } else if (j + 2 == num_segments) {
                     si_next = cycle.back();
-
                 } else {
                     segments.push_back(v0);
                     segments.push_back(segment[1]);
@@ -80,6 +97,13 @@ std::vector<Index> triangulate(
                 }
                 assert(si_prev != invalid_signed_index);
                 assert(si_next != invalid_signed_index);
+                if (triangle_cycle_indices.size() - 1 == 58) {
+                    logger().debug(
+                        "Adding triangle: {} {} {}",
+                        value_of(si_prev),
+                        value_of(si_curr),
+                        value_of(si_next));
+                }
                 triangle_cycles.push_back(si_prev);
                 triangle_cycles.push_back(si_curr);
                 triangle_cycles.push_back(si_next);
@@ -210,15 +234,25 @@ void Contour<3>::triangulate_cycles()
 template <>
 void Contour<4>::triangulate_cycles()
 {
-    auto cycle_to_triangle_map = triangulate(m_segments, m_cycles, m_cycle_start_indices);
+    check_all_cycles();
+    check_all_polyhedra();
 
+    {
+        auto p0 = get_vertex(4);
+        auto p1 = get_vertex(5);
+        logger().debug("v4: {} {} {} {}", p0[0], p0[1], p0[2], p0[3]);
+        logger().debug("v5: {} {} {} {}", p1[0], p1[1], p1[2], p1[3]);
+    }
+    print_polyhedron(*this, 16);
+    auto cycle_to_triangle_map = triangulate(m_segments, m_cycles, m_cycle_start_indices);
+    check_all_cycles();
+
+    size_t num_polyhedra = get_num_polyhedra();
     std::vector<SignedIndex> updated_polyhedra;
     std::vector<Index> updated_polyhedron_start_indices;
     updated_polyhedra.reserve(m_polyhedra.size());
     updated_polyhedron_start_indices.reserve(m_polyhedron_start_indices.size());
     updated_polyhedron_start_indices.push_back(0);
-
-    size_t num_polyhedra = get_num_polyhedra();
 
     for (size_t i = 0; i < num_polyhedra; i++) {
         Index cycle_start = m_polyhedron_start_indices[i];
@@ -241,6 +275,7 @@ void Contour<4>::triangulate_cycles()
     std::swap(m_polyhedra, updated_polyhedra);
     std::swap(m_polyhedron_start_indices, updated_polyhedron_start_indices);
 
+    print_polyhedron(*this, 16);
     num_polyhedra = get_num_polyhedra();
     for (size_t i = 0; i < num_polyhedra; i++) {
         check_polyhedron(i);
@@ -286,6 +321,11 @@ Contour<4> Contour<4>::isocontour(std::span<Scalar> function_values) const
             }
         }
         disjoint_cycles.extract_cycles(result.m_cycles, result.m_cycle_start_indices);
+    }
+
+    size_t out_num_polyhedra = result.get_num_polyhedra();
+    for (size_t i = 0; i < out_num_polyhedra; i++) {
+        result.check_polyhedron(i);
     }
 
     return result;

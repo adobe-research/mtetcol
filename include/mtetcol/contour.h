@@ -267,11 +267,20 @@ private:
             Index li = ori_i ? 1 : 0;
             Index lj = ori_j ? 0 : 1;
 
+            assert(seg_i[li] == seg_j[lj]);
             if (seg_i[li] != seg_j[lj]) {
                 return false;
             }
         }
         return true;
+    }
+
+    void check_all_cycles() const
+    {
+        size_t num_cycles = get_num_cycles();
+        for (size_t ci=0; ci < num_cycles; ci++) {
+            check_cycle(ci);
+        }
     }
 
     /**
@@ -285,20 +294,35 @@ private:
      */
     bool check_polyhedron(Index poly_id) const
     {
-        logger().trace("Check polyhedron {}", poly_id);
+        logger().trace("### Check polyhedron {} ###", poly_id);
         int32_t sum = 0;
         auto poly = get_polyhedron(poly_id);
         for (auto ci : poly) {
-            logger().trace("Check cycle {}", index(ci));
             auto cycle = get_cycle(index(ci));
-            int32_t sign = orientation(ci) ? 1 : -1;
+            bool cycle_ori = orientation(ci);
+            int32_t sign = cycle_ori ? 1 : -1;
+            logger().trace("Check cycle {} ({})", index(ci), sign);
             for (auto si : cycle) {
-                logger().trace("Check segment {}", value_of(si));
+                Index seg_id = index(si);
+                Index seg_ori = orientation(si);
+                auto seg = get_segment(seg_id);
+                Index v0 = seg[seg_ori == cycle_ori ? 0 : 1];
+                Index v1 = seg[seg_ori == cycle_ori ? 1 : 0];
+
+                logger().trace("Check segment {} ({} -> {})", value_of(si) * sign, v0, v1);
                 sum += value_of(si) * sign;
             }
         }
         assert(sum == 0);
         return sum == 0;
+    }
+
+    void check_all_polyhedra() const
+    {
+        size_t num_polyhedra = get_num_polyhedra();
+        for (size_t pi=0; pi < num_polyhedra; pi++) {
+            check_polyhedron(pi);
+        }
     }
 
 
