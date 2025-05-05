@@ -87,12 +87,14 @@ int main(int argc, char** argv)
     constexpr size_t num_time_samples_per_vertex = 10;
 
     mtetcol::ImplicitSphere base_shape(0.2, {0.25, 0.25, 0.25});
-    mtetcol::Translation<3> translation({0.5, 0.5, 0.6});
+    mtetcol::Translation<3> translation({-0.5, -0.5, -0.5});
     mtetcol::SweepFunction<3> sweep_function(base_shape, translation);
     sample_time_derivative(column, sweep_function, num_time_samples_per_vertex);
 
     auto contour = column.extract_contour(0.0);
     contour.triangulate_cycles();
+
+    mtetcol::save_contour("contour.msh", contour);
 
     size_t num_contour_vertices = contour.get_num_vertices();
     std::vector<mtetcol::Scalar> function_values(num_contour_vertices);

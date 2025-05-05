@@ -10,6 +10,7 @@ include(strong_type)
 include(unordered_dense)
 include(spdlog)
 include(smallvector)
+include(mshio)
 
 file(GLOB INC_FILES ${CMAKE_CURRENT_LIST_DIR}/include/mtetcol/*.h)
 file(GLOB SRC_FILES ${CMAKE_CURRENT_LIST_DIR}/src/*.cpp)
@@ -23,6 +24,7 @@ target_link_libraries(mtetcol
     PRIVATE
     unordered_dense::unordered_dense
     spdlog::spdlog
+    mshio::mshio
 )
 
 add_library(mtetcol::mtetcol ALIAS mtetcol)
