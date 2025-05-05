@@ -16,15 +16,15 @@ simplicial columns, particularly useful for swept volume analysis and contour ex
 
 ## Requirements
 
-- C++17 or later
-- CMake 3.10 or later
-- A modern C++ compiler (GCC 7+, Clang 5+, or MSVC 2019+)
+- C++20 or later
+- CMake 3.28 or later
+- A modern C++ compiler
 
 ## Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mtetcol.git
+git clone https://github.com/qnzhou/mtetcol.git
 cd mtetcol
 
 # Create build directory
