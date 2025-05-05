@@ -34,7 +34,7 @@ mshio::MshSpec generate_spec(const Contour<4>& contour)
     node_block.tags.reserve(nodes.num_nodes);
     node_block.data.reserve(nodes.num_nodes * 3);
 
-    for (size_t i=0; i<num_vertices; i++) {
+    for (size_t i = 0; i < num_vertices; i++) {
         auto pos = contour.get_vertex(i);
         node_block.tags.push_back(i + 1);
         node_block.data.push_back(pos[0]);
@@ -57,7 +57,7 @@ mshio::MshSpec generate_spec(const Contour<4>& contour)
     element_block.num_elements_in_block = elements.num_elements;
     element_block.data.reserve(elements.num_elements * 4);
 
-    for (size_t i=0; i<num_cycles; i++) {
+    for (size_t i = 0; i < num_cycles; i++) {
         auto cycle = contour.get_cycle(i);
         assert(cycle.size() == 3);
         element_block.data.push_back(i + 1);
@@ -80,16 +80,35 @@ mshio::MshSpec generate_spec(const Contour<4>& contour)
 
     auto& entries = node_data.entries;
     entries.resize(num_vertices);
-    for (size_t i=0; i<num_vertices; i++) {
+    for (size_t i = 0; i < num_vertices; i++) {
         auto pos = contour.get_vertex(i);
         auto& entry = entries[i];
-        entry.tag = i+1;
+        entry.tag = i + 1;
         entry.data = {pos[3]};
     }
 
     spec.node_data.push_back(std::move(node_data));
 
     return spec;
+}
+
+void add_scalar_field(mshio::MshSpec& spec, std::string name, std::span<Scalar> field)
+{
+    mshio::Data node_data;
+    node_data.header.string_tags.push_back(name);
+    node_data.header.int_tags.push_back(0);
+    node_data.header.int_tags.push_back(1);
+    node_data.header.int_tags.push_back(field.size());
+
+    auto& entries = node_data.entries;
+    entries.resize(field.size());
+    for (size_t i = 0; i < field.size(); i++) {
+        auto& entry = entries[i];
+        entry.tag = i + 1;
+        entry.data = {field[i]};
+    }
+
+    spec.node_data.push_back(std::move(node_data));
 }
 
 } // namespace
@@ -101,11 +120,18 @@ void save_contour(std::string_view filename, const Contour<3>& contour)
     // Implement saving logic for 3D contour
 }
 
-void save_contour(std::string_view filename, const Contour<4>& contour)
+void save_contour(
+    std::string_view filename,
+    const Contour<4>& contour,
+    std::span<Scalar> function_values)
 {
     logger().info("Saving contour to {}", filename);
     if (filename.ends_with(".msh")) {
         auto spec = generate_spec(contour);
+        if (!function_values.empty()) {
+            assert(function_values.size() == contour.get_num_vertices());
+            add_scalar_field(spec, "values", function_values);
+        }
         mshio::save_msh(std::string(filename), spec);
     } else {
         std::ofstream fout(filename.data());

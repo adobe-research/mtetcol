@@ -1,7 +1,7 @@
 #include <mtetcol/contour.h>
-#include <mtetcol/simplicial_column.h>
 #include <mtetcol/io.h>
 #include <mtetcol/logger.h>
+#include <mtetcol/simplicial_column.h>
 
 #include <ankerl/unordered_dense.h>
 #include <mtet/io.h>
@@ -59,12 +59,22 @@ void sample_time_derivative(
     std::vector<Scalar> function_values;
     function_values.reserve(time_samples.size());
 
+    auto finite_difference = [&](Scalar x, Scalar y, Scalar z, Scalar t) {
+        constexpr auto eps = 1e-6;
+        auto f_prev = sweep_function.value({x, y, z}, t - eps);
+        auto f_next = sweep_function.value({x, y, z}, t + eps);
+        return (f_next - f_prev) / (2 * eps);
+    };
+
     column.set_time_samples(
         [&](Index) { return std::span<Scalar>(time_samples.data(), time_samples.size()); },
         [&](Index vi) {
             function_values.clear();
             auto pos = column.get_spatial_vertex(vi);
             for (const auto& t : time_samples) {
+                auto dt_fd = finite_difference(pos[0], pos[1], pos[2], t);
+                auto dt = sweep_function.time_derivative({pos[0], pos[1], pos[2]}, t);
+                assert(std::abs(dt - dt_fd) < 1e-5);
                 function_values.push_back(
                     sweep_function.time_derivative({pos[0], pos[1], pos[2]}, t));
             }
@@ -76,7 +86,12 @@ int main(int argc, char** argv)
 {
     mtetcol::logger().set_level(spdlog::level::debug);
 
-    auto tet_mesh = grid::generate_tet_mesh({10, 10, 10}, {0, 0, 0}, {1, 1, 1}, grid::TET5);
+    constexpr size_t resolution = 33;
+    auto tet_mesh = grid::generate_tet_mesh(
+        {resolution, resolution, resolution},
+        {0, 0, 0},
+        {1, 1, 1},
+        grid::TET5);
     mtet::save_mesh("grid.msh", tet_mesh);
 
     auto [vertices, tets] = generate_simpicial_column<mtetcol::Scalar, mtetcol::Index>(tet_mesh);
@@ -86,26 +101,30 @@ int main(int argc, char** argv)
 
     constexpr size_t num_time_samples_per_vertex = 10;
 
-    mtetcol::ImplicitSphere base_shape(0.2, {0.25, 0.25, 0.25});
-    mtetcol::Translation<3> translation({-0.5, -0.5, -0.5});
+    mtetcol::ImplicitSphere base_shape(0.2, {0.25, 0.5, 0.5});
+    mtetcol::Translation<3> translation({-0.5, 0, 0});
+    mtetcol::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
     mtetcol::SweepFunction<3> sweep_function(base_shape, translation);
+    // mtetcol::SweepFunction<3> sweep_function(base_shape, rotation);
     sample_time_derivative(column, sweep_function, num_time_samples_per_vertex);
 
-    auto contour = column.extract_contour(0.0);
+    auto contour = column.extract_contour(0.0, false);
+    // auto contour = column.extract_contour(0.0, true);
     contour.triangulate_cycles();
-
-    mtetcol::save_contour("contour.msh", contour);
 
     size_t num_contour_vertices = contour.get_num_vertices();
     std::vector<mtetcol::Scalar> function_values(num_contour_vertices);
-    for (size_t i=0; i< num_contour_vertices; ++i) {
+    for (size_t i = 0; i < num_contour_vertices; ++i) {
         auto pos = contour.get_vertex(i);
         function_values[i] = sweep_function.value({pos[0], pos[1], pos[2]}, pos[3]);
     }
+    mtetcol::save_contour("contour.msh", contour, function_values);
+
     auto isocontour = contour.isocontour(function_values);
     mtetcol::save_contour("tmp.obj", isocontour);
 
     isocontour.triangulate_cycles();
+    mtetcol::save_contour("tmp.msh", isocontour);
 
     return 0;
 }

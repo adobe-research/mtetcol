@@ -33,10 +33,13 @@ public:
 
     std::array<Scalar, 3> gradient(std::array<Scalar, 3> pos) const override
     {
-        Scalar d = value(pos);
-        if (d == 0) return {0, 0, 0};
+        Scalar r = std::sqrt(
+            (pos[0] - m_center[0]) * (pos[0] - m_center[0]) +
+            (pos[1] - m_center[1]) * (pos[1] - m_center[1]) +
+            (pos[2] - m_center[2]) * (pos[2] - m_center[2]));
+        if (r == 0) return {0, 0, 0};
 
-        return {(pos[0] - m_center[0]) / d, (pos[1] - m_center[1]) / d, (pos[2] - m_center[2]) / d};
+        return {(pos[0] - m_center[0]) / r, (pos[1] - m_center[1]) / r, (pos[2] - m_center[2]) / r};
     }
 
 private:

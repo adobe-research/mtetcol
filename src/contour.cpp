@@ -138,7 +138,7 @@ std::vector<Index> compute_zero_crossing_vertices(
                 {pos0[0] + t * (pos1[0] - pos0[0]),
                  pos0[1] + t * (pos1[1] - pos0[1]),
                  pos0[2] + t * (pos1[2] - pos0[2]),
-                 pos0[2] + t * (pos1[3] - pos0[3])});
+                 pos0[3] + t * (pos1[3] - pos0[3])});
         }
         return static_cast<Index>(result.get_num_vertices() - 1);
     };
