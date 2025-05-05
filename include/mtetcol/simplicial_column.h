@@ -33,6 +33,13 @@ public:
         m_vertices = vertices;
     }
 
+    /**
+     * @brief Sets the spatial simplices (triangles or tetrahedra) of the simplicial column.
+     * 
+     * @param simplices A span of indices representing the simplices. For triangles, each simplex
+     *                  should be represented by 3 indices. For tetrahedra, each simplex should be
+     *                  represented by 4 indices.
+     */
     void set_simplices(std::span<Index> simplices);
 
     /**
@@ -139,16 +146,17 @@ public:
     }
 
     /**
-     * @brief Get the number of spatial edges.
+     * @brief Get the number of spatial edges in the simplicial column.
      *
      * @return The number of spatial edges.
      */
     [[nodiscard]] size_t get_num_spatial_edges() const { return m_edges.size() / 2; }
 
     /**
-     * @brief Get the spatial edge buffer.
+     * @brief Get the spatial edge buffer containing vertex indices.
      *
-     * @return The spatial edge buffer.
+     * @return A span of indices where each pair of consecutive indices represents an edge
+     *         connecting two vertices.
      */
     [[nodiscard]] std::span<const Index> get_spatial_edges() const
     {
@@ -156,16 +164,17 @@ public:
     }
 
     /**
-     * @brief Get the number of spatial triangles.
+     * @brief Get the number of spatial triangles in the simplicial column.
      *
      * @return The number of spatial triangles.
      */
     [[nodiscard]] size_t get_num_spatial_triangles() const { return m_triangles.size() / 3; }
 
     /**
-     * @brief Get the spatial triangle buffer.
+     * @brief Get the spatial triangle buffer containing vertex indices.
      *
-     * @return The spatial triangle buffer.
+     * @return A span of indices where each triplet of consecutive indices represents a triangle
+     *         formed by three vertices.
      */
     [[nodiscard]] std::span<const SignedIndex> get_spatial_triangles() const
     {
@@ -173,16 +182,17 @@ public:
     }
 
     /**
-     * @brief Get the number of spatial tetrahedra.
+     * @brief Get the number of spatial tetrahedra in the simplicial column.
      *
      * @return The number of spatial tetrahedra.
      */
     [[nodiscard]] size_t get_num_spatial_tetrahedra() const { return m_tetrahedra.size() / 4; }
 
     /**
-     * @brief Get the spatial tetrahedra buffer.
+     * @brief Get the spatial tetrahedra buffer containing vertex indices.
      *
-     * @return The spatial tetrahedra buffer.
+     * @return A span of indices where each quadruplet of consecutive indices represents a tetrahedron
+     *         formed by four vertices.
      */
     [[nodiscard]] std::span<const SignedIndex> get_spatial_tetrahedra() const
     {

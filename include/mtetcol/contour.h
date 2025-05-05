@@ -245,9 +245,9 @@ private:
      * @brief Check if the cycle is valid.
      *
      * A cycle is valid if each pair of consecutive segments share a vertex.
+     * This ensures the cycle forms a closed loop.
      *
      * @param cid The index of the cycle to check.
-     *
      * @return True if the cycle is valid, false otherwise.
      */
     bool check_cycle(Index cid) const
@@ -275,6 +275,12 @@ private:
         return true;
     }
 
+    /**
+     * @brief Check all cycles in the contour for validity.
+     *
+     * This method iterates through all cycles and calls check_cycle() on each one.
+     * It is used for debugging purposes to ensure the contour's integrity.
+     */
     void check_all_cycles() const
     {
         size_t num_cycles = get_num_cycles();
@@ -284,12 +290,12 @@ private:
     }
 
     /**
-     * Check if the polyhedron is valid.
+     * @brief Check if the polyhedron is valid.
      *
-     * The sum of signed segment indices of all cycles in the polyhedron should be zero.
+     * A polyhedron is valid if the sum of signed segment indices of all cycles in the polyhedron is zero.
+     * This ensures the polyhedron forms a closed surface.
      *
      * @param poly_id The index of the polyhedron to check.
-     *
      * @return True if the polyhedron is valid, false otherwise.
      */
     bool check_polyhedron(Index poly_id) const
@@ -317,6 +323,12 @@ private:
         return sum == 0;
     }
 
+    /**
+     * @brief Check all polyhedra in the contour for validity.
+     *
+     * This method iterates through all polyhedra and calls check_polyhedron() on each one.
+     * It is used for debugging purposes to ensure the contour's integrity.
+     */
     void check_all_polyhedra() const
     {
         size_t num_polyhedra = get_num_polyhedra();
