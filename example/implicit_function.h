@@ -47,4 +47,41 @@ private:
     std::array<Scalar, 3> m_center;
 };
 
+class ImplicitTorus : public ImplicitFunction<3>
+{
+public:
+    ImplicitTorus(Scalar R, Scalar r, std::array<Scalar, 3> center)
+        : m_R(R)
+        , m_r(r)
+        , m_center(center)
+    {}
+
+    Scalar value(std::array<Scalar, 3> pos) const override
+    {
+        Scalar x = pos[0] - m_center[0];
+        Scalar y = pos[1] - m_center[1];
+        Scalar z = pos[2] - m_center[2];
+
+        return std::sqrt(z * z + (std::sqrt(x * x + y * y) - m_R) * (std::sqrt(x * x + y * y) - m_R)) - m_r;
+    }
+
+    std::array<Scalar, 3> gradient(std::array<Scalar, 3> pos) const override
+    {
+        Scalar x = pos[0] - m_center[0];
+        Scalar y = pos[1] - m_center[1];
+        Scalar z = pos[2] - m_center[2];
+
+        Scalar r = std::sqrt(x * x + y * y);
+        Scalar r2 = r * r;
+        Scalar r3 = r2 * r;
+
+        return {x / r3, y / r3, z / (r2 + (r - m_R) * (r - m_R))};
+    }
+
+private:
+    Scalar m_R;
+    Scalar m_r;
+    std::array<Scalar, 3> m_center;
+}
+
 } // namespace mtetcol
