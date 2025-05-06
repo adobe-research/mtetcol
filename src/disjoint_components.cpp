@@ -70,9 +70,8 @@ void DisjointComponents::extract_components(
         }
     }
 
-    size_t num_cycles = m_cycle_indices.size() - 1;
     ankerl::unordered_dense::set<Index> involved;
-    involved.reserve(32);
+    involved.reserve(m_active_cycles.size());
 
     std::function<void(SignedIndex)> grow_component;
     grow_component = [&](SignedIndex cid) {
@@ -140,7 +139,6 @@ void DisjointComponents::check_cycles() const
     if (m_cycle_indices.empty()) {
         throw std::invalid_argument("Cycle indices must not be empty");
     }
-    size_t num_cycles = m_cycle_indices.size() - 1;
     size_t num_segments = m_positive_segment_map.size();
 
     for (auto cid : m_cycles) {
