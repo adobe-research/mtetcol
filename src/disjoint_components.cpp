@@ -1,6 +1,8 @@
 #include <mtetcol/disjoint_components.h>
 #include <mtetcol/logger.h>
 
+#include <ankerl/unordered_dense.h>
+
 #include <cassert>
 #include <functional>
 #include <stdexcept>
@@ -69,15 +71,16 @@ void DisjointComponents::extract_components(
     }
 
     size_t num_cycles = m_cycle_indices.size() - 1;
-    std::vector<bool> involved(num_cycles, false);
+    ankerl::unordered_dense::set<Index> involved;
+    involved.reserve(32);
 
     std::function<void(SignedIndex)> grow_component;
     grow_component = [&](SignedIndex cid) {
         Index cycle_id = index(cid);
         bool cycle_ori = orientation(cid);
 
-        assert(!involved[cycle_id]);
-        involved[cycle_id] = true;
+        assert(!involved.contains(cycle_id));
+        involved.insert(cycle_id);
         polyhedra.push_back(cid);
 
         Index cycle_begin = m_cycle_indices[cycle_id];
@@ -101,7 +104,7 @@ void DisjointComponents::extract_components(
                     throw std::runtime_error("Active cycle does not form closed component");
                 }
                 Index adj_cycle_id = index(adj_cycle);
-                if (!involved[adj_cycle_id]) {
+                if (!involved.contains(adj_cycle_id)) {
                     grow_component(adj_cycle);
                 }
             } else {
@@ -114,7 +117,7 @@ void DisjointComponents::extract_components(
                     throw std::runtime_error("Active cycle does not form closed component");
                 }
                 Index adj_cycle_id = index(adj_cycle);
-                if (!involved[adj_cycle_id]) {
+                if (!involved.contains(adj_cycle_id)) {
                     grow_component(adj_cycle);
                 }
             }
@@ -124,7 +127,7 @@ void DisjointComponents::extract_components(
     for (auto cid : m_active_cycles) {
         Index cycle_id = index(cid);
         bool cycle_ori = orientation(cid);
-        if (involved[cycle_id]) {
+        if (involved.contains(cycle_id)) {
             continue;
         }
         grow_component(cid);
