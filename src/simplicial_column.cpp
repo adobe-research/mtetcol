@@ -19,6 +19,8 @@ void SimplicialColumn<4>::set_simplices(std::span<Index> simplices)
 
     EdgeMap edges;
     TriangleMap triangles;
+    edges.reserve(simplices.size() / 4 * 3);
+    triangles.reserve(simplices.size() / 4 * 4);
 
     size_t num_tets = simplices.size() / 4;
     m_tetrahedra.reserve(num_tets * 4);
