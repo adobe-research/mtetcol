@@ -3,7 +3,6 @@
 #include <mtetcol/common.h>
 
 #include <array>
-#include <nonstd/indirect_value.hpp>
 #include <span>
 
 namespace mtetcol {
@@ -140,8 +139,7 @@ public:
         return velocity;
     }
 
-    std::array<Scalar, dim> finite_difference(
-        std::array<Scalar, dim> pos, Scalar t) const
+    std::array<Scalar, dim> finite_difference(std::array<Scalar, dim> pos, Scalar t) const
     {
         constexpr Scalar delta = 1e-6;
         std::array<Scalar, dim> pos_plus_delta = transform(pos, t + delta);
@@ -158,6 +156,40 @@ public:
 private:
     std::array<Scalar, dim> m_center;
     std::array<Scalar, dim> m_axis;
+};
+
+
+template <int dim>
+class Compose : public Transform<dim>
+{
+public:
+    Compose(Transform<dim>& transform1, Transform<dim>& transform2)
+        : m_transform1(transform1)
+        , m_transform2(transform2)
+    {}
+
+    std::array<Scalar, dim> transform(std::array<Scalar, dim> pos, Scalar t) const override
+    {
+        auto intermediate = m_transform1.transform(pos, t);
+        return m_transform2.transform(intermediate, t);
+    }
+
+    std::array<Scalar, dim> velocity(std::array<Scalar, dim> pos, Scalar t) const override
+    {
+        // Using finite difference to calculate the velocity
+        constexpr Scalar delta = 1e-6;
+        auto value_prev = transform(pos, t - delta);
+        auto value_next = transform(pos, t + delta);
+        std::array<Scalar, dim> velocity;
+        for (int i = 0; i < dim; ++i) {
+            velocity[i] = (value_next[i] - value_prev[i]) / (2 * delta);
+        }
+        return velocity;
+    }
+
+private:
+    Transform<dim>& m_transform1;
+    Transform<dim>& m_transform2;
 };
 
 

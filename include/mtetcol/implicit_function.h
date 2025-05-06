@@ -61,8 +61,9 @@ public:
         Scalar x = pos[0] - m_center[0];
         Scalar y = pos[1] - m_center[1];
         Scalar z = pos[2] - m_center[2];
+        Scalar len_xy = std::sqrt(x * x + y * y);
 
-        return std::sqrt(z * z + (std::sqrt(x * x + y * y) - m_R) * (std::sqrt(x * x + y * y) - m_R)) - m_r;
+        return std::sqrt(z * z + (len_xy - m_R) * (len_xy - m_R)) - m_r;
     }
 
     std::array<Scalar, 3> gradient(std::array<Scalar, 3> pos) const override
@@ -71,17 +72,32 @@ public:
         Scalar y = pos[1] - m_center[1];
         Scalar z = pos[2] - m_center[2];
 
-        Scalar r = std::sqrt(x * x + y * y);
-        Scalar r2 = r * r;
-        Scalar r3 = r2 * r;
+        Scalar len_xy = std::sqrt(x * x + y * y);
 
-        return {x / r3, y / r3, z / (r2 + (r - m_R) * (r - m_R))};
+        // Avoid division by zero (if point is at z-axis)
+        if (len_xy < 1e-6f) {
+            return {0, 0, static_cast<Scalar>(z >= 0 ? 1 : -1)};
+        }
+
+        Scalar a = len_xy - m_R;
+        Scalar q_len = std::sqrt(a * a + z * z);
+
+        // Again avoid division by zero if exactly on torus surface
+        if (q_len < 1e-6f) {
+            return {0, 0, 0}; // Undefined
+        }
+
+        Scalar dx = (a / q_len) * (x / len_xy);
+        Scalar dy = (a / q_len) * (y / len_xy);
+        Scalar dz = z / q_len;
+
+        return {dx, dy, dz};
     }
 
 private:
     Scalar m_R;
     Scalar m_r;
     std::array<Scalar, 3> m_center;
-}
+};
 
 } // namespace mtetcol

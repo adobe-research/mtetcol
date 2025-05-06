@@ -423,33 +423,6 @@ TEST_CASE("simplicial_column", "[mtetcol]")
             std::span<Index>(vertex_start_indices.data(), vertex_start_indices.size()));
 
         mtetcol::Contour<3> contour = columns.extract_contour(0, false);
-        {
-            mtetcol::logger().set_level(spdlog::level::debug);
-
-            size_t num_vertices = contour.get_num_vertices();
-            for (size_t i = 0; i < num_vertices; i++) {
-                auto pos = contour.get_vertex(i);
-                mtetcol::logger().debug("Vertex {}: ({}, {})  t: {}", i, pos[0], pos[1], pos[2]);
-            }
-
-            size_t num_segments = contour.get_num_segments();
-            for (size_t i = 0; i < num_segments; i++) {
-                auto segment = contour.get_segment(i);
-                mtetcol::logger().debug("Segment {}: ({}, {})", i, segment[0], segment[1]);
-            }
-
-            size_t num_cycles = contour.get_num_cycles();
-            for (size_t i = 0; i < num_cycles; i++) {
-                auto cycle = contour.get_cycle(i);
-                std::string str = fmt::format("Cycle {}: ", i);
-                for (auto si : cycle) {
-                    str += fmt::format("{} ", value_of(si));
-                }
-                mtetcol::logger().debug("{}", str);
-            }
-
-            mtetcol::logger().set_level(spdlog::level::warn);
-        }
         REQUIRE(contour.get_num_vertices() == 5);
         REQUIRE(contour.get_num_segments() == 4);
     }

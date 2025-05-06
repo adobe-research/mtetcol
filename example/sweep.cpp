@@ -1,15 +1,15 @@
 #include <mtetcol/contour.h>
+#include <mtetcol/implicit_function.h>
 #include <mtetcol/io.h>
 #include <mtetcol/logger.h>
 #include <mtetcol/simplicial_column.h>
+#include <mtetcol/sweep_function.h>
+#include <mtetcol/transform.h>
 
 #include <ankerl/unordered_dense.h>
 #include <mtet/io.h>
 
 #include "grid.h"
-#include "implicit_function.h"
-#include "sweep_function.h"
-#include "transform.h"
 
 template <typename Scalar, typename Index>
 std::tuple<std::vector<Scalar>, std::vector<Index>> generate_simpicial_column(
@@ -104,12 +104,12 @@ int main(int argc, char** argv)
     mtetcol::ImplicitSphere base_shape(0.2, {0.25, 0.5, 0.5});
     mtetcol::Translation<3> translation({-0.5, 0, 0});
     mtetcol::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
-    mtetcol::SweepFunction<3> sweep_function(base_shape, translation);
-    // mtetcol::SweepFunction<3> sweep_function(base_shape, rotation);
+    // mtetcol::SweepFunction<3> sweep_function(base_shape, translation);
+    mtetcol::SweepFunction<3> sweep_function(base_shape, rotation);
     sample_time_derivative(column, sweep_function, num_time_samples_per_vertex);
 
-    auto contour = column.extract_contour(0.0, false);
-    // auto contour = column.extract_contour(0.0, true);
+    // auto contour = column.extract_contour(0.0, false);
+    auto contour = column.extract_contour(0.0, true);
     contour.triangulate_cycles();
 
     size_t num_contour_vertices = contour.get_num_vertices();
