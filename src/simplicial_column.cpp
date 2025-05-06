@@ -16,11 +16,12 @@ template <>
 void SimplicialColumn<4>::set_simplices(std::span<Index> simplices)
 {
     assert(simplices.size() % 4 == 0);
+    logger().info("Set simplices with {} tets", simplices.size() / 4);
 
     EdgeMap edges;
     TriangleMap triangles;
-    edges.reserve(simplices.size() / 4 * 3);
-    triangles.reserve(simplices.size() / 4 * 4);
+    edges.reserve(simplices.size() * 3);
+    triangles.reserve(simplices.size() / 2);
 
     size_t num_tets = simplices.size() / 4;
     m_tetrahedra.reserve(num_tets * 4);
@@ -73,6 +74,11 @@ void SimplicialColumn<4>::set_simplices(std::span<Index> simplices)
     assert(check_edges(*this));
     assert(check_triangles(*this));
     assert(check_tetrahedra(*this));
+
+    logger().info("num_vertices: {}", m_vertices.size() / 3);
+    logger().info("num_edges: {}", m_edges.size() / 2);
+    logger().info("num_triangles: {}", m_triangles.size() / 3);
+    logger().info("num_tetrahedra: {}", m_tetrahedra.size() / 4);
 }
 
 template <>
@@ -121,6 +127,7 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
         m_vertex_start_indices,
         value,
         cyclic);
+    logger().info("Contour vertices: {}", contour_times.size());
 
     auto [contour_segments, contour_segment_on_edges, contour_segment_on_edges_indices] =
         extract_contour_segments(
@@ -129,6 +136,7 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
             initial_signs,
             m_edges,
             cyclic);
+    logger().info("Contour segments: {}", contour_segments.size() / 2);
 
     auto [contour_cycles, contour_cycle_indices, contour_cycle_triangle_indices] =
         extract_contour_cycles(
@@ -140,6 +148,7 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
             m_triangles);
     assert(contour_cycle_triangle_indices.back() == contour_cycle_indices.size() - 1);
     assert(contour_cycle_indices.back() == contour_cycles.size());
+    logger().info("Contour cycles: {}", contour_cycle_indices.size() - 1);
 
     auto [contour_polyhedra, contour_polyhedron_indices, contour_polyhedron_tet_indices] =
         extract_contour_polyhedra(
@@ -148,6 +157,7 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
             contour_cycle_indices,
             contour_cycle_triangle_indices,
             m_tetrahedra);
+    logger().info("Contour polyhedra: {}", contour_polyhedron_indices.size() - 1);
 
     Contour<4> contour;
 

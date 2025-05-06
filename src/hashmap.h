@@ -14,7 +14,7 @@ using Triangle = std::array<Index, 3>; // [v0, v1, v2]
 struct EdgeHash
 {
     using is_transparent = void;
-    using is_avalanching = void;
+    // using is_avalanching = void;
 
     [[nodiscard]] inline auto operator()(const Edge& edge) const noexcept -> uint64_t
     {
@@ -36,7 +36,7 @@ struct EdgeEqual
 struct TriangleHash
 {
     using is_transparent = void;
-    using is_avalanching = void;
+    // using is_avalanching = void;
 
     [[nodiscard]] inline auto operator()(const Triangle& tri) const noexcept -> uint64_t
     {
@@ -72,15 +72,8 @@ using TriangleMap = ankerl::unordered_dense::map<Triangle, Index, TriangleHash, 
 
 inline SignedIndex add_edge(const Edge& e, EdgeMap& edges)
 {
-    auto it = edges.find(e);
-    if (it != edges.end()) {
-        Index eid = it->second;
-        return signed_index(eid, e[0] < e[1]);
-    } else {
-        Index eid = static_cast<Index>(edges.size());
-        edges[e] = eid;
-        return signed_index(eid, e[0] < e[1]);
-    }
+    auto [it, _] = edges.try_emplace(e, static_cast<Index>(edges.size()));
+    return signed_index(it->second, e[0] < e[1]);
 }
 
 inline SignedIndex get_edge(const Edge& e, const EdgeMap& edges)
@@ -97,15 +90,8 @@ inline SignedIndex add_triangle(const Triangle& t, TriangleMap& triangles)
     const int8_t sign = (t[0] < t[1] ? 1 : -1) + (t[1] < t[2] ? 1 : -1) + (t[2] < t[0] ? 1 : -1);
     assert(sign == 1 || sign == -1);
 
-    auto it = triangles.find(t);
-    if (it != triangles.end()) {
-        Index tid = it->second;
-        return signed_index(tid, sign == 1);
-    } else {
-        Index tid = static_cast<Index>(triangles.size());
-        triangles[t] = tid;
-        return signed_index(tid, sign == 1);
-    }
+    auto [it, _] = triangles.try_emplace(t, static_cast<Index>(triangles.size()));
+    return signed_index(it->second, sign == 1);
 }
 
 } // namespace mtetcol
