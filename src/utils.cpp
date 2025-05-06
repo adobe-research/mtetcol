@@ -290,6 +290,11 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
     std::vector<Index> contour_cycle_indices;
     std::vector<Index> contour_cycle_triangle_indices;
 
+    // Reserve space based on number of triangles and expected cycles per triangle
+    contour_cycles.reserve(triangles.size() / 3 * 2); // Rough estimate: 2 cycles per triangle
+    contour_cycle_indices.reserve(triangles.size() / 3 + 1);
+    contour_cycle_triangle_indices.reserve(triangles.size() / 3 + 1);
+
     contour_cycle_indices.push_back(0);
     contour_cycle_triangle_indices.push_back(0);
 
@@ -351,9 +356,11 @@ extract_contour_polyhedra(
     std::vector<SignedIndex> polyhedra;
     std::vector<Index> polyhedron_indices;
     std::vector<Index> polyhedron_tet_indices;
-    polyhedra.reserve(num_cycles * 2);
+
+    polyhedra.reserve(num_cycles);
     polyhedron_indices.reserve(num_cycles + 1);
     polyhedron_tet_indices.reserve(num_tets + 1);
+
     polyhedron_indices.push_back(0);
     polyhedron_tet_indices.push_back(0);
 

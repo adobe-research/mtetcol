@@ -81,6 +81,7 @@ void SimplicialColumn<3>::set_simplices(std::span<Index> simplices)
     assert(simplices.size() % 3 == 0);
 
     EdgeMap edges;
+    edges.reserve(simplices.size() / 2 ); // num simplices * 3 / 2
 
     size_t num_tris = simplices.size() / 3;
     m_triangles.reserve(num_tris * 3);
@@ -151,6 +152,10 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
     Contour<4> contour;
 
     size_t num_contour_vertices = contour_time_indices.size() - 1;
+    size_t num_segments = contour_segments.size() / 2;
+    size_t num_cycles = contour_cycle_indices.size() - 1;
+    size_t num_polyhedra = contour_polyhedron_indices.size() - 1;
+
     for (size_t i = 0; i < num_contour_vertices; i++) {
         std::span<Scalar> position = m_vertices.subspan(i * 3, 3);
         std::span<Scalar> time_samples(
@@ -161,19 +166,16 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
         }
     }
 
-    size_t num_segments = contour_segments.size() / 2;
     for (size_t i = 0; i < num_segments; i++) {
         contour.add_segment(contour_segments[i * 2], contour_segments[i * 2 + 1]);
     }
 
-    size_t num_cycles = contour_cycle_indices.size() - 1;
     for (size_t i = 0; i < num_cycles; i++) {
         contour.add_cycle(std::span<SignedIndex>(
             contour_cycles.data() + contour_cycle_indices[i],
             contour_cycle_indices[i + 1] - contour_cycle_indices[i]));
     }
 
-    size_t num_polyhedra = contour_polyhedron_indices.size() - 1;
     for (size_t i = 0; i < num_polyhedra; i++) {
         contour.add_polyhedron(std::span<SignedIndex>(
             contour_polyhedra.data() + contour_polyhedron_indices[i],
@@ -215,6 +217,9 @@ Contour<3> SimplicialColumn<3>::extract_contour(Scalar value, bool cyclic) const
     Contour<3> contour;
 
     size_t num_contour_vertices = contour_time_indices.size() - 1;
+    size_t num_segments = contour_segments.size() / 2;
+    size_t num_cycles = contour_cycle_indices.size() - 1;
+
     for (size_t i = 0; i < num_contour_vertices; i++) {
         std::span<Scalar> position = m_vertices.subspan(i * 2, 2);
         std::span<Scalar> time_samples(
@@ -225,12 +230,10 @@ Contour<3> SimplicialColumn<3>::extract_contour(Scalar value, bool cyclic) const
         }
     }
 
-    size_t num_segments = contour_segments.size() / 2;
     for (size_t i = 0; i < num_segments; i++) {
         contour.add_segment(contour_segments[i * 2], contour_segments[i * 2 + 1]);
     }
 
-    size_t num_cycles = contour_cycle_indices.size() - 1;
     for (size_t i = 0; i < num_cycles; i++) {
         contour.add_cycle(std::span<SignedIndex>(
             contour_cycles.data() + contour_cycle_indices[i],
