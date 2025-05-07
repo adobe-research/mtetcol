@@ -81,8 +81,6 @@ TEST_CASE("benchmark", "[mtetcol][.benchmark]")
     constexpr size_t resolution = 64;
     constexpr size_t num_time_samples_per_vertex = 64;
 
-    mtetcol::logger().set_level(spdlog::level::warn);
-
     auto grid = mtet::generate_tet_grid(
         {resolution, resolution, resolution},
         {0, 0, 0},
@@ -92,6 +90,8 @@ TEST_CASE("benchmark", "[mtetcol][.benchmark]")
     mtetcol::SimplicialColumn<4> columns;
     columns.set_vertices(vertices);
     columns.set_simplices(tets);
+
+    mtetcol::logger().set_level(spdlog::level::warn);
 
     mtetcol::ImplicitTorus base_shape(0.2, 0.04, {0.25, 0.5, 0.5});
     mtetcol::Rotation<3> rotation({0.25, 0.5, 0.5}, {1, 0, 0});
@@ -104,8 +104,24 @@ TEST_CASE("benchmark", "[mtetcol][.benchmark]")
 
     columns.set_time_samples(time_samples, function_values, vertex_start_indices);
 
-    BENCHMARK("Extract time derivative contour")
+    BENCHMARK("Stage 1: `f_t=0` contour")
     {
         return columns.extract_contour(0.0, false);
+    };
+
+    auto contour = columns.extract_contour(0.0, false);
+    contour.triangulate_cycles();
+
+    size_t num_contour_vertices = contour.get_num_vertices();
+    function_values.clear();
+    function_values.resize(num_contour_vertices);
+    for (size_t i = 0; i < num_contour_vertices; ++i) {
+        auto pos = contour.get_vertex(i);
+        function_values[i] = sweep_function.value({pos[0], pos[1], pos[2]}, pos[3]);
+    }
+
+    BENCHMARK("Stage 2: `f=0` contour")
+    {
+        return contour.isocontour(function_values);
     };
 }
