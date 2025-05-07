@@ -218,20 +218,27 @@ void Contour<3>::triangulate_cycles()
     [[maybe_unused]] auto cycle_to_triangle_map =
         triangulate(m_segments, m_cycles, m_cycle_start_indices);
 
+#ifndef NDEBUG
     size_t num_cycles = get_num_cycles();
     for (size_t i = 0; i < num_cycles; i++) {
         check_cycle(i);
     }
+#endif
 }
 
 template <>
 void Contour<4>::triangulate_cycles()
 {
+#ifndef NDEBUG
     check_all_cycles();
     check_all_polyhedra();
+#endif
 
     auto cycle_to_triangle_map = triangulate(m_segments, m_cycles, m_cycle_start_indices);
+
+#ifndef NDEBUG
     check_all_cycles();
+#endif
 
     size_t num_polyhedra = get_num_polyhedra();
     std::vector<SignedIndex> updated_polyhedra;
@@ -261,10 +268,12 @@ void Contour<4>::triangulate_cycles()
     std::swap(m_polyhedra, updated_polyhedra);
     std::swap(m_polyhedron_start_indices, updated_polyhedron_start_indices);
 
+#ifndef NDEBUG
     num_polyhedra = get_num_polyhedra();
     for (size_t i = 0; i < num_polyhedra; i++) {
         check_polyhedron(i);
     }
+#endif
 }
 
 template <>
@@ -309,10 +318,13 @@ Contour<4> Contour<4>::isocontour(std::span<Scalar> function_values) const
         disjoint_cycles.extract_cycles(result.m_cycles, result.m_cycle_start_indices);
     }
 
+
+#ifndef NDEBUG
     size_t out_num_polyhedra = result.get_num_polyhedra();
     for (size_t i = 0; i < out_num_polyhedra; i++) {
         result.check_polyhedron(i);
     }
+#endif
 
     return result;
 }
