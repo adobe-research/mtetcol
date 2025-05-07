@@ -22,9 +22,9 @@ target_link_libraries(mtetcol
     strong_type::strong_type
     smallvector::smallvector
     PRIVATE
-    unordered_dense::unordered_dense
-    spdlog::spdlog
     mshio::mshio
+    spdlog::spdlog
+    unordered_dense::unordered_dense
 )
 
 add_library(mtetcol::mtetcol ALIAS mtetcol)
@@ -40,11 +40,11 @@ if (MTETCOL_BUILD_EXAMPLE)
     add_executable(sweep ${CMAKE_CURRENT_LIST_DIR}/example/sweep.cpp)
     target_link_libraries(sweep
         PRIVATE
-        mtetcol::mtetcol
-        spdlog::spdlog
         mtet::mtet
-        unordered_dense::unordered_dense
+        mtetcol::mtetcol
         nonstd::indirect-value-lite
+        spdlog::spdlog
+        unordered_dense::unordered_dense
     )
     target_compile_features(sweep PRIVATE cxx_std_20)
 endif()
@@ -58,9 +58,11 @@ if(MTETCOL_BUILD_TESTS)
     add_executable(mtetcol_tests ${TEST_FILES})
     target_link_libraries(mtetcol_tests
         PRIVATE
-        mtetcol::mtetcol
         Catch2::Catch2WithMain
+        mtet::mtet
+        mtetcol::mtetcol
         spdlog::spdlog
+        unordered_dense::unordered_dense
     )
     target_include_directories(mtetcol_tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
     target_compile_definitions(mtetcol_tests PRIVATE CATCH_CONFIG_ENABLE_BENCHMARKING)
