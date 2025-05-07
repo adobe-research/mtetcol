@@ -8,5 +8,5 @@ include(CPM)
 CPMAddPackage(
   NAME mtet
   GITHUB_REPOSITORY qnzhou/mtet
-  GIT_TAG e964d02b51ba62ff7b432e946722de5e80aa9f05
+  GIT_TAG 62bd4bed56d8685835aee5019d4463918bf4cbe0
 )

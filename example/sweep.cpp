@@ -8,10 +8,9 @@
 
 #include <ankerl/unordered_dense.h>
 #include <mtet/io.h>
+#include <mtet/grid.h>
 
 #include <chrono>
-
-#include "grid.h"
 
 template <typename Scalar, typename Index>
 std::tuple<std::vector<Scalar>, std::vector<Index>> generate_simpicial_column(
@@ -206,11 +205,11 @@ int main(int argc, char** argv)
     mtetcol::logger().set_level(spdlog::level::debug);
 
     constexpr size_t resolution = 67;
-    auto tet_mesh = grid::generate_tet_mesh(
+    auto tet_mesh = mtet::generate_tet_grid(
         {resolution, resolution, resolution},
         {0, 0, 0},
         {1, 1, 1},
-        grid::TET5);
+        mtet::TET5);
     mtet::save_mesh("grid.msh", tet_mesh);
 
     auto [vertices, tets] = generate_simpicial_column<mtetcol::Scalar, mtetcol::Index>(tet_mesh);
