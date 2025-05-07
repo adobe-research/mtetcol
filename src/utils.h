@@ -181,8 +181,16 @@ std::tuple<std::vector<Scalar>, std::vector<size_t>, std::vector<bool>> extract_
  * - A vector of contour segments. (Each segment is represented by two consecutive indices.)
  * - A vector of oriented contour segment indices over each edge relative to the edge orinetation.
  * - A vector of indices separating the contour segments over edges of each spatial edge.
+ * - A vector of booleans indicating if each spatial edge is __simple__.
+ * - A vector of [-1, 0, 1] indicating the cyclic shift direction (for cyclic domain and simple edge
+ * only)
  */
-std::tuple<std::vector<Index>, std::vector<SignedIndex>, std::vector<Index>>
+std::tuple<
+    std::vector<Index>,
+    std::vector<SignedIndex>,
+    std::vector<Index>,
+    std::vector<bool>,
+    std::vector<int8_t>>
 extract_contour_segments(
     const std::vector<Scalar>& contour_times,
     const std::vector<size_t>& contour_time_indices,
@@ -198,6 +206,9 @@ extract_contour_segments(
  * @param contour_segment_over_edges The oriented contour segment indices over each edge.
  * @param contour_segment_over_edges_indices Indices separating the contour segments over edges of
  * each spatial edge.
+ * @param edge_is_simple A vector indicating if each spatial edge is simple.
+ * @param edge_shift A vector indicating the cyclic shift direction of the time sampels for the
+ * first vertex of the edge.
  * @param edges The spatial edges of the simplicial column.
  * @param triangles The spatial triangles of the simplicial column.
  *
@@ -205,14 +216,18 @@ extract_contour_segments(
  * - A vector of signed indices of contour segments representing the contour cycles.
  * - A vector of indices separating the individual cycles.
  * - A vector of indices separating the contour cycles of each spatial triangle.
+ * - A vector of booleans indicating if each spatial triangle is simple.
  */
-std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> extract_contour_cycles(
+auto extract_contour_cycles(
     const size_t num_contour_vertices,
     const std::vector<Index>& contour_segments,
     const std::vector<SignedIndex>& contour_segment_over_edges,
     const std::vector<Index>& contour_segment_over_edges_indices,
+    const std::vector<bool>& edge_is_simple,
+    const std::vector<int8_t>& edge_shift,
     const std::vector<Index>& edges,
-    const std::vector<SignedIndex>& triangles);
+    const std::vector<SignedIndex>& triangles) -> std::
+    tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>, std::vector<bool>>;
 
 /**
  * @brief Extracts the contour polyhedra from the contour cycles.
@@ -222,6 +237,7 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
  * @param contour_cycle_indices Indices separating the individual cycles.
  * @param contour_cycle_triangle_indices Indices separating the contour cycles of each spatial
  * triangle.
+ * @param triangle_is_simple A vector indicating if each spatial triangle is simple.
  * @param tetrahedra The spatial tetrahedra of the simplicial column.
  *
  * @return A tuple containing:
@@ -235,6 +251,7 @@ extract_contour_polyhedra(
     const std::vector<SignedIndex>& contour_cycles,
     const std::vector<Index>& contour_cycle_indices,
     const std::vector<Index>& contour_cycle_triangle_indices,
+    const std::vector<bool>& triangle_is_simple,
     const std::vector<SignedIndex>& tetrahedra);
 
 } // namespace mtetcol

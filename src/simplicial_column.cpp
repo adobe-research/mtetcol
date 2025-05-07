@@ -87,7 +87,7 @@ void SimplicialColumn<3>::set_simplices(std::span<Index> simplices)
     assert(simplices.size() % 3 == 0);
 
     EdgeMap edges;
-    edges.reserve(simplices.size() / 2 ); // num simplices * 3 / 2
+    edges.reserve(simplices.size() / 2); // num simplices * 3 / 2
 
     size_t num_tris = simplices.size() / 3;
     m_triangles.reserve(num_tris * 3);
@@ -129,23 +129,34 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
         cyclic);
     logger().info("Contour vertices: {}", contour_times.size());
 
-    auto [contour_segments, contour_segment_on_edges, contour_segment_on_edges_indices] =
-        extract_contour_segments(
-            contour_times,
-            contour_time_indices,
-            initial_signs,
-            m_edges,
-            cyclic);
+    auto
+        [contour_segments,
+         contour_segment_on_edges,
+         contour_segment_on_edges_indices,
+         edge_is_simple,
+         edge_shift] =
+            extract_contour_segments(
+                contour_times,
+                contour_time_indices,
+                initial_signs,
+                m_edges,
+                cyclic);
     logger().info("Contour segments: {}", contour_segments.size() / 2);
 
-    auto [contour_cycles, contour_cycle_indices, contour_cycle_triangle_indices] =
-        extract_contour_cycles(
-            contour_times.size(),
-            contour_segments,
-            contour_segment_on_edges,
-            contour_segment_on_edges_indices,
-            m_edges,
-            m_triangles);
+    auto
+        [contour_cycles,
+         contour_cycle_indices,
+         contour_cycle_triangle_indices,
+         triangle_is_simple] =
+            extract_contour_cycles(
+                contour_times.size(),
+                contour_segments,
+                contour_segment_on_edges,
+                contour_segment_on_edges_indices,
+                edge_is_simple,
+                edge_shift,
+                m_edges,
+                m_triangles);
     assert(contour_cycle_triangle_indices.back() == contour_cycle_indices.size() - 1);
     assert(contour_cycle_indices.back() == contour_cycles.size());
     logger().info("Contour cycles: {}", contour_cycle_indices.size() - 1);
@@ -156,6 +167,7 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
             contour_cycles,
             contour_cycle_indices,
             contour_cycle_triangle_indices,
+            triangle_is_simple,
             m_tetrahedra);
     logger().info("Contour polyhedra: {}", contour_polyhedron_indices.size() - 1);
 
@@ -205,22 +217,33 @@ Contour<3> SimplicialColumn<3>::extract_contour(Scalar value, bool cyclic) const
         value,
         cyclic);
 
-    auto [contour_segments, contour_segment_on_edges, contour_segment_on_edges_indices] =
-        extract_contour_segments(
-            contour_times,
-            contour_time_indices,
-            initial_signs,
-            m_edges,
-            cyclic);
+    auto
+        [contour_segments,
+         contour_segment_on_edges,
+         contour_segment_on_edges_indices,
+         edge_is_simple,
+         edge_shift] =
+            extract_contour_segments(
+                contour_times,
+                contour_time_indices,
+                initial_signs,
+                m_edges,
+                cyclic);
 
-    auto [contour_cycles, contour_cycle_indices, contour_cycle_triangle_indices] =
-        extract_contour_cycles(
-            contour_times.size(),
-            contour_segments,
-            contour_segment_on_edges,
-            contour_segment_on_edges_indices,
-            m_edges,
-            m_triangles);
+    auto
+        [contour_cycles,
+         contour_cycle_indices,
+         contour_cycle_triangle_indices,
+         triangle_is_simple] =
+            extract_contour_cycles(
+                contour_times.size(),
+                contour_segments,
+                contour_segment_on_edges,
+                contour_segment_on_edges_indices,
+                edge_is_simple,
+                edge_shift,
+                m_edges,
+                m_triangles);
     assert(contour_cycle_triangle_indices.back() == contour_cycle_indices.size() - 1);
     assert(contour_cycle_indices.back() == contour_cycles.size());
 

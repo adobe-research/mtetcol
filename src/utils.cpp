@@ -121,7 +121,12 @@ std::tuple<std::vector<Scalar>, std::vector<size_t>, std::vector<bool>> extract_
         std::move(initial_signs)};
 }
 
-std::tuple<std::vector<Index>, std::vector<SignedIndex>, std::vector<Index>>
+std::tuple<
+    std::vector<Index>,
+    std::vector<SignedIndex>,
+    std::vector<Index>,
+    std::vector<bool>,
+    std::vector<int8_t>>
 extract_contour_segments(
     const std::vector<Scalar>& contour_times,
     const std::vector<size_t>& contour_time_indices,
@@ -135,6 +140,8 @@ extract_contour_segments(
     std::vector<Index> segments;
     std::vector<SignedIndex> segment_on_edges;
     std::vector<Index> segment_on_edges_indices;
+    std::vector<bool> is_simple(num_edges, true);
+    std::vector<int8_t> shift(num_edges, 0);
     segments.reserve(contour_times.size() * 2);
     segment_on_edges.reserve(contour_times.size()); // Just a guess
     segment_on_edges_indices.reserve(num_edges + 1);
@@ -209,12 +216,14 @@ extract_contour_segments(
                     if (!initial_signs[v0]) {
                         parity = 1;
                     }
+                    shift[ei] = -1;
                 } else {
                     // First merged time sample is on v1.
                     // Shifting does not change the initial sign of v0's first sample.
                     if (initial_signs[v0]) {
                         parity = 1;
                     }
+                    shift[ei] = 1;
                 }
             } else {
                 if (initial_signs[v0]) {
@@ -253,6 +262,7 @@ extract_contour_segments(
                     vertical_edge_map[{p0, p1}] = segments.size() / 2;
                     seg_id = add_segment(p0, p1);
                 }
+                is_simple[ei] = false;
             } else {
                 // cross edge
                 seg_id = add_segment(p0, p1);
@@ -275,20 +285,30 @@ extract_contour_segments(
         segment_on_edges_indices.push_back(static_cast<Index>(segment_on_edges.size()));
     }
 
-    return {std::move(segments), std::move(segment_on_edges), std::move(segment_on_edges_indices)};
+    return {
+        std::move(segments),
+        std::move(segment_on_edges),
+        std::move(segment_on_edges_indices),
+        std::move(is_simple),
+        std::move(shift),
+    };
 }
 
-std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> extract_contour_cycles(
+auto extract_contour_cycles(
     const size_t num_contour_vertices,
     const std::vector<Index>& contour_segments,
     const std::vector<SignedIndex>& contour_segment_on_edges,
     const std::vector<Index>& contour_segment_on_edges_indices,
+    const std::vector<bool>& edge_is_simple,
+    const std::vector<int8_t>& edge_shift,
     const std::vector<Index>& edges,
-    const std::vector<SignedIndex>& triangles)
+    const std::vector<SignedIndex>& triangles) -> std::
+    tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>, std::vector<bool>>
 {
     std::vector<SignedIndex> contour_cycles;
     std::vector<Index> contour_cycle_indices;
     std::vector<Index> contour_cycle_triangle_indices;
+    std::vector<bool> triangle_is_simple(triangles.size() / 3, true);
 
     // Reserve space based on number of triangles and expected cycles per triangle
     contour_cycles.reserve(triangles.size() / 3 * 2); // Rough estimate: 2 cycles per triangle
@@ -312,6 +332,62 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
         }
     };
 
+    auto is_connected = [&](SignedIndex seg_01, SignedIndex seg_12) {
+        Index seg_01_id = index(seg_01);
+        Index seg_12_id = index(seg_12);
+        bool seg_01_ori = orientation(seg_01);
+        bool seg_12_ori = orientation(seg_12);
+
+        Index seg_01_v1 =
+            seg_01_ori ? contour_segments[seg_01_id * 2 + 1] : contour_segments[seg_01_id * 2];
+        Index seg_12_v1 =
+            seg_12_ori ? contour_segments[seg_12_id * 2] : contour_segments[seg_12_id * 2 + 1];
+        return seg_01_v1 == seg_12_v1;
+    };
+
+    auto extract_simple_cycle =
+        [&](Index e01_id, Index e12_id, Index e20_id, bool e01_ori, bool e12_ori, bool e20_ori) {
+            Index e01_seg_begin = contour_segment_on_edges_indices[e01_id];
+            Index e01_seg_end = contour_segment_on_edges_indices[e01_id + 1];
+            Index e12_seg_begin = contour_segment_on_edges_indices[e12_id];
+            Index e12_seg_end = contour_segment_on_edges_indices[e12_id + 1];
+            Index e20_seg_begin = contour_segment_on_edges_indices[e20_id];
+            Index e20_seg_end = contour_segment_on_edges_indices[e20_id + 1];
+
+            Index num_segments_over_edge = e01_seg_end - e01_seg_begin;
+            assert(num_segments_over_edge == e12_seg_end - e12_seg_begin);
+            assert(num_segments_over_edge == e20_seg_end - e20_seg_begin);
+
+            for (Index i = 0; i < num_segments_over_edge; i++) {
+                SignedIndex seg_01 = contour_segment_on_edges[e01_seg_begin + i];
+                SignedIndex seg_12 = contour_segment_on_edges[e12_seg_begin + i];
+                SignedIndex seg_20 = contour_segment_on_edges[e20_seg_begin + i];
+
+                if (!e01_ori) seg_01 = -seg_01;
+                if (!e12_ori) seg_12 = -seg_12;
+                if (!e20_ori) seg_20 = -seg_20;
+
+                if (is_connected(seg_01, seg_12)) {
+                    assert(is_connected(seg_12, seg_20));
+                    assert(is_connected(seg_20, seg_01));
+
+                    contour_cycles.push_back(seg_01);
+                    contour_cycles.push_back(seg_12);
+                    contour_cycles.push_back(seg_20);
+                } else {
+                    assert(is_connected(seg_01, seg_20));
+                    assert(is_connected(seg_12, seg_01));
+                    assert(is_connected(seg_20, seg_12));
+
+                    contour_cycles.push_back(seg_01);
+                    contour_cycles.push_back(seg_20);
+                    contour_cycles.push_back(seg_12);
+                }
+
+                contour_cycle_indices.push_back(static_cast<Index>(contour_cycles.size()));
+            }
+        };
+
     assert(triangles.size() % 3 == 0);
     const size_t num_triangles = triangles.size() / 3;
     for (size_t ti = 0; ti < num_triangles; ti++) {
@@ -329,16 +405,35 @@ std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>> ext
         bool e12_ori = orientation(e12);
         bool e20_ori = orientation(e20);
 
-        register_edge(e01_id, e01_ori);
-        register_edge(e12_id, e12_ori);
-        register_edge(e20_id, e20_ori);
+        // More precise check.
+        // triangle_is_simple[ti] =
+        //     edge_is_simple[e01_id] && edge_is_simple[e12_id] && edge_is_simple[e20_id] &&
+        //     ((edge_shift[e01_id] * (e01_ori ? 1 : -1) + edge_shift[e12_id] * (e12_ori ? 1 : -1) +
+        //       edge_shift[e20_id] * (e20_ori ? 1 : -1)) == 0);
 
-        cycle_engine.extract_cycles(contour_cycles, contour_cycle_indices);
+        // More conservative check.
+        triangle_is_simple[ti] = edge_is_simple[e01_id] && edge_is_simple[e12_id] &&
+                                 edge_is_simple[e20_id] && edge_shift[e01_id] == 0 &&
+                                 edge_shift[e12_id] == 0 && edge_shift[e20_id] == 0;
+
+        if (triangle_is_simple[ti]) {
+            extract_simple_cycle(e01_id, e12_id, e20_id, e01_ori, e12_ori, e20_ori);
+        } else {
+            register_edge(e01_id, e01_ori);
+            register_edge(e12_id, e12_ori);
+            register_edge(e20_id, e20_ori);
+
+            cycle_engine.extract_cycles(contour_cycles, contour_cycle_indices);
+        }
 
         contour_cycle_triangle_indices.push_back(contour_cycle_indices.size() - 1);
     }
 
-    return {contour_cycles, contour_cycle_indices, contour_cycle_triangle_indices};
+    return {
+        contour_cycles,
+        contour_cycle_indices,
+        contour_cycle_triangle_indices,
+        triangle_is_simple};
 }
 
 std::tuple<std::vector<SignedIndex>, std::vector<Index>, std::vector<Index>>
@@ -347,6 +442,7 @@ extract_contour_polyhedra(
     const std::vector<SignedIndex>& contour_cycles,
     const std::vector<Index>& contour_cycle_indices,
     const std::vector<Index>& contour_cycle_triangle_indices,
+    const std::vector<bool>& triangle_is_simple,
     const std::vector<SignedIndex>& tetrahedra)
 {
     size_t num_cycles = contour_cycle_indices.size() - 1;
@@ -377,6 +473,48 @@ extract_contour_polyhedra(
         }
     };
 
+    auto extract_simple_components = [&](Index t021_id,
+                                         Index t123_id,
+                                         Index t013_id,
+                                         Index t032_id,
+                                         bool t021_ori,
+                                         bool t123_ori,
+                                         bool t013_ori,
+                                         bool t032_ori) {
+        Index cycles_021_begin = contour_cycle_triangle_indices[t021_id];
+        Index cycles_021_end = contour_cycle_triangle_indices[t021_id + 1];
+        Index cycles_123_begin = contour_cycle_triangle_indices[t123_id];
+        Index cycles_123_end = contour_cycle_triangle_indices[t123_id + 1];
+        Index cycles_013_begin = contour_cycle_triangle_indices[t013_id];
+        Index cycles_013_end = contour_cycle_triangle_indices[t013_id + 1];
+        Index cycles_032_begin = contour_cycle_triangle_indices[t032_id];
+        Index cycles_032_end = contour_cycle_triangle_indices[t032_id + 1];
+
+        Index num_cycles_per_triangle = cycles_021_end - cycles_021_begin;
+        assert(num_cycles_per_triangle == cycles_123_end - cycles_123_begin);
+        assert(num_cycles_per_triangle == cycles_013_end - cycles_013_begin);
+        assert(num_cycles_per_triangle == cycles_032_end - cycles_032_begin);
+
+        for (Index i=0; i<num_cycles_per_triangle; i++) {
+            Index cycle_021_id = cycles_021_begin + i;
+            Index cycle_123_id = cycles_123_begin + i;
+            Index cycle_013_id = cycles_013_begin + i;
+            Index cycle_032_id = cycles_032_begin + i;
+
+            SignedIndex cycle_021 = signed_index(cycle_021_id, t021_ori);
+            SignedIndex cycle_123 = signed_index(cycle_123_id, t123_ori);
+            SignedIndex cycle_013 = signed_index(cycle_013_id, t013_ori);
+            SignedIndex cycle_032 = signed_index(cycle_032_id, t032_ori);
+
+            polyhedra.push_back(cycle_021);
+            polyhedra.push_back(cycle_123);
+            polyhedra.push_back(cycle_013);
+            polyhedra.push_back(cycle_032);
+
+            polyhedron_indices.push_back(static_cast<Index>(polyhedra.size()));
+        }
+    };
+
     auto compute_components =
         [&](SignedIndex t021, SignedIndex t123, SignedIndex t013, SignedIndex t032) {
             component_engine.clear();
@@ -396,21 +534,38 @@ extract_contour_polyhedra(
             bool t013_ori = orientation(t013);
             bool t032_ori = orientation(t032);
 
-            Index cycles_021_begin = contour_cycle_triangle_indices[t021_id];
-            Index cycles_021_end = contour_cycle_triangle_indices[t021_id + 1];
-            Index cycles_123_begin = contour_cycle_triangle_indices[t123_id];
-            Index cycles_123_end = contour_cycle_triangle_indices[t123_id + 1];
-            Index cycles_013_begin = contour_cycle_triangle_indices[t013_id];
-            Index cycles_013_end = contour_cycle_triangle_indices[t013_id + 1];
-            Index cycles_032_begin = contour_cycle_triangle_indices[t032_id];
-            Index cycles_032_end = contour_cycle_triangle_indices[t032_id + 1];
+            bool polyhedron_is_simple = triangle_is_simple[t021_id] &&
+                                        triangle_is_simple[t123_id] &&
+                                        triangle_is_simple[t013_id] && triangle_is_simple[t032_id];
 
-            register_cycles(cycles_021_begin, cycles_021_end, t021_ori);
-            register_cycles(cycles_123_begin, cycles_123_end, t123_ori);
-            register_cycles(cycles_013_begin, cycles_013_end, t013_ori);
-            register_cycles(cycles_032_begin, cycles_032_end, t032_ori);
+            if (polyhedron_is_simple) {
+                extract_simple_components(
+                    t021_id,
+                    t123_id,
+                    t013_id,
+                    t032_id,
+                    t021_ori,
+                    t123_ori,
+                    t013_ori,
+                    t032_ori);
+            } else {
+                Index cycles_021_begin = contour_cycle_triangle_indices[t021_id];
+                Index cycles_021_end = contour_cycle_triangle_indices[t021_id + 1];
+                Index cycles_123_begin = contour_cycle_triangle_indices[t123_id];
+                Index cycles_123_end = contour_cycle_triangle_indices[t123_id + 1];
+                Index cycles_013_begin = contour_cycle_triangle_indices[t013_id];
+                Index cycles_013_end = contour_cycle_triangle_indices[t013_id + 1];
+                Index cycles_032_begin = contour_cycle_triangle_indices[t032_id];
+                Index cycles_032_end = contour_cycle_triangle_indices[t032_id + 1];
 
-            component_engine.extract_components(polyhedra, polyhedron_indices);
+                register_cycles(cycles_021_begin, cycles_021_end, t021_ori);
+                register_cycles(cycles_123_begin, cycles_123_end, t123_ori);
+                register_cycles(cycles_013_begin, cycles_013_end, t013_ori);
+                register_cycles(cycles_032_begin, cycles_032_end, t032_ori);
+
+                component_engine.extract_components(polyhedra, polyhedron_indices);
+            }
+
             polyhedron_tet_indices.push_back(static_cast<Index>(polyhedron_indices.size() - 1));
         };
 
