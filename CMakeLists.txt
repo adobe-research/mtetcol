@@ -37,6 +37,7 @@ set_target_properties(mtetcol PROPERTIES
 if (MTETCOL_BUILD_EXAMPLE)
     include(mtet)
     include(indirect-value-lite)
+
     add_executable(sweep ${CMAKE_CURRENT_LIST_DIR}/example/sweep.cpp)
     target_link_libraries(sweep
         PRIVATE
@@ -47,6 +48,16 @@ if (MTETCOL_BUILD_EXAMPLE)
         unordered_dense::unordered_dense
     )
     target_compile_features(sweep PRIVATE cxx_std_20)
+
+    add_executable(sweep2d ${CMAKE_CURRENT_LIST_DIR}/example/sweep2d.cpp)
+    target_link_libraries(sweep2d
+        PRIVATE
+        mtetcol::mtetcol
+        nonstd::indirect-value-lite
+        spdlog::spdlog
+        unordered_dense::unordered_dense
+    )
+    target_compile_features(sweep2d PRIVATE cxx_std_20)
 endif()
 
 if(MTETCOL_BUILD_TESTS)

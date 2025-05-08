@@ -12,12 +12,12 @@ namespace mtetcol {
 /**
  * @class DisjointCycles
  * @brief A class for managing and extracting disjoint cycles from a set of segments.
- * 
+ *
  * This class provides functionality to:
  * - Register and unregister segments
  * - Extract cycles by chaining oriented segments
  * - Validate segment data
- * 
+ *
  * The class maintains a graph-like structure where segments are edges between vertices,
  * and cycles are closed paths in this graph.
  */
@@ -51,7 +51,7 @@ public:
 
     /**
      * @brief Unregisters all segments from the cycle extraction.
-     * 
+     *
      * This clears all previously registered segments, allowing for a fresh start
      * in cycle extraction.
      */
@@ -91,9 +91,10 @@ private:
     void check_segments() const;
 
 private:
-    std::vector<SignedIndex> m_next_index;  ///< Maps each vertex to its next vertex in a cycle
-    std::span<const Index> m_segments;      ///< The input segments as vertex index pairs
-    llvm_vecsmall::SmallVector<SignedIndex, 16> m_active_segments;  ///< Currently active segments for cycle extraction
+    std::vector<SignedIndex> m_next_index; ///< Maps each vertex to its next vertex in a cycle
+    std::span<const Index> m_segments; ///< The input segments as vertex index pairs
+    llvm_vecsmall::SmallVector<SignedIndex, 16>
+        m_active_segments; ///< Currently active segments for cycle extraction
 };
 
 } // namespace mtetcol

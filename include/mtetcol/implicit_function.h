@@ -14,6 +14,37 @@ public:
     virtual std::array<Scalar, dim> gradient(std::array<Scalar, dim> pos) const = 0;
 };
 
+class ImplicitCircle : public ImplicitFunction<2>
+{
+public:
+    ImplicitCircle(Scalar radius, std::array<Scalar, 2> center)
+        : m_radius(radius)
+        , m_center(center)
+    {}
+
+    Scalar value(std::array<Scalar, 2> pos) const override
+    {
+        return std::sqrt(
+                   (pos[0] - m_center[0]) * (pos[0] - m_center[0]) +
+                   (pos[1] - m_center[1]) * (pos[1] - m_center[1])) -
+               m_radius;
+    }
+
+    std::array<Scalar, 2> gradient(std::array<Scalar, 2> pos) const override
+    {
+        Scalar r = std::sqrt(
+            (pos[0] - m_center[0]) * (pos[0] - m_center[0]) +
+            (pos[1] - m_center[1]) * (pos[1] - m_center[1]));
+        if (r == 0) return {0, 0};
+
+        return {(pos[0] - m_center[0]) / r, (pos[1] - m_center[1]) / r};
+    }
+
+private:
+    Scalar m_radius;
+    std::array<Scalar, 2> m_center;
+};
+
 class ImplicitSphere : public ImplicitFunction<3>
 {
 public:

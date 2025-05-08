@@ -51,92 +51,117 @@ public:
 
     std::array<Scalar, dim> transform(std::array<Scalar, dim> pos, Scalar t) const override
     {
-        static_assert(dim == 3, "Rotation is only implemented for 3D");
+        if constexpr (dim == 3) {
+            // Convert angle to radians
+            Scalar angle = t * 2 * M_PI; // Full rotation in 1 second
 
-        // Convert angle to radians
-        Scalar angle = t * 2 * M_PI; // Full rotation in 1 second
+            // Normalize the axis
+            Scalar axis_length = 0;
+            for (int i = 0; i < dim; ++i) {
+                axis_length += m_axis[i] * m_axis[i];
+            }
+            axis_length = std::sqrt(axis_length);
 
-        // Normalize the axis
-        Scalar axis_length = 0;
-        for (int i = 0; i < dim; ++i) {
-            axis_length += m_axis[i] * m_axis[i];
+            std::array<Scalar, dim> normalized_axis;
+            for (int i = 0; i < dim; ++i) {
+                normalized_axis[i] = m_axis[i] / axis_length;
+            }
+
+            // Rodrigues' rotation formula
+            Scalar cos_angle = std::cos(angle);
+            Scalar sin_angle = std::sin(angle);
+
+            // Translate point to origin
+            for (int i = 0; i < dim; ++i) {
+                pos[i] -= m_center[i];
+            }
+
+            // Apply rotation
+            std::array<Scalar, dim> result;
+            result[0] =
+                pos[0] * (cos_angle + normalized_axis[0] * normalized_axis[0] * (1 - cos_angle)) +
+                pos[1] * (normalized_axis[0] * normalized_axis[1] * (1 - cos_angle) -
+                          normalized_axis[2] * sin_angle) +
+                pos[2] * (normalized_axis[0] * normalized_axis[2] * (1 - cos_angle) +
+                          normalized_axis[1] * sin_angle);
+
+            result[1] =
+                pos[0] * (normalized_axis[1] * normalized_axis[0] * (1 - cos_angle) +
+                          normalized_axis[2] * sin_angle) +
+                pos[1] * (cos_angle + normalized_axis[1] * normalized_axis[1] * (1 - cos_angle)) +
+                pos[2] * (normalized_axis[1] * normalized_axis[2] * (1 - cos_angle) -
+                          normalized_axis[0] * sin_angle);
+
+            result[2] =
+                pos[0] * (normalized_axis[2] * normalized_axis[0] * (1 - cos_angle) -
+                          normalized_axis[1] * sin_angle) +
+                pos[1] * (normalized_axis[2] * normalized_axis[1] * (1 - cos_angle) +
+                          normalized_axis[0] * sin_angle) +
+                pos[2] * (cos_angle + normalized_axis[2] * normalized_axis[2] * (1 - cos_angle));
+
+            // Translate back from origin
+            for (int i = 0; i < dim; ++i) {
+                result[i] += m_center[i];
+            }
+
+            return result;
+        } else {
+            static_assert(dim == 2, "Rotation is only implemented for 2D and 3d");
+
+            // Convert angle to radians
+            Scalar angle = t * 2 * M_PI; // Full rotation in 1 second
+
+            pos[0] -= m_center[0];
+            pos[1] -= m_center[1];
+
+            std::array<Scalar, dim> result;
+            result[0] = pos[0] * std::cos(angle) - pos[1] * std::sin(angle) + m_center[0];
+            result[1] = pos[0] * std::sin(angle) + pos[1] * std::cos(angle) + m_center[1];
+
+            return result;
         }
-        axis_length = std::sqrt(axis_length);
-
-        std::array<Scalar, dim> normalized_axis;
-        for (int i = 0; i < dim; ++i) {
-            normalized_axis[i] = m_axis[i] / axis_length;
-        }
-
-        // Rodrigues' rotation formula
-        Scalar cos_angle = std::cos(angle);
-        Scalar sin_angle = std::sin(angle);
-
-        // Translate point to origin
-        for (int i = 0; i < dim; ++i) {
-            pos[i] -= m_center[i];
-        }
-
-        // Apply rotation
-        std::array<Scalar, dim> result;
-        result[0] =
-            pos[0] * (cos_angle + normalized_axis[0] * normalized_axis[0] * (1 - cos_angle)) +
-            pos[1] * (normalized_axis[0] * normalized_axis[1] * (1 - cos_angle) -
-                      normalized_axis[2] * sin_angle) +
-            pos[2] * (normalized_axis[0] * normalized_axis[2] * (1 - cos_angle) +
-                      normalized_axis[1] * sin_angle);
-
-        result[1] =
-            pos[0] * (normalized_axis[1] * normalized_axis[0] * (1 - cos_angle) +
-                      normalized_axis[2] * sin_angle) +
-            pos[1] * (cos_angle + normalized_axis[1] * normalized_axis[1] * (1 - cos_angle)) +
-            pos[2] * (normalized_axis[1] * normalized_axis[2] * (1 - cos_angle) -
-                      normalized_axis[0] * sin_angle);
-
-        result[2] =
-            pos[0] * (normalized_axis[2] * normalized_axis[0] * (1 - cos_angle) -
-                      normalized_axis[1] * sin_angle) +
-            pos[1] * (normalized_axis[2] * normalized_axis[1] * (1 - cos_angle) +
-                      normalized_axis[0] * sin_angle) +
-            pos[2] * (cos_angle + normalized_axis[2] * normalized_axis[2] * (1 - cos_angle));
-
-        // Translate back from origin
-        for (int i = 0; i < dim; ++i) {
-            result[i] += m_center[i];
-        }
-
-        return result;
     }
 
     std::array<Scalar, dim> velocity(std::array<Scalar, dim> pos, Scalar t) const override
     {
-        static_assert(dim == 3, "Rotation is only implemented for 3D");
+        if constexpr (dim == 3) {
+            // Normalize the axis
+            Scalar axis_length = 0;
+            for (int i = 0; i < dim; ++i) {
+                axis_length += m_axis[i] * m_axis[i];
+            }
+            axis_length = std::sqrt(axis_length);
 
-        // Normalize the axis
-        Scalar axis_length = 0;
-        for (int i = 0; i < dim; ++i) {
-            axis_length += m_axis[i] * m_axis[i];
+            std::array<Scalar, dim> normalized_axis;
+            for (int i = 0; i < dim; ++i) {
+                normalized_axis[i] = m_axis[i] / axis_length;
+            }
+
+            pos = transform(pos, t);
+            // Translate point to origin
+            for (int i = 0; i < dim; ++i) {
+                pos[i] -= m_center[i];
+            }
+
+            // Cross product of axis and position gives the velocity direction
+            std::array<Scalar, dim> velocity;
+            velocity[0] = (normalized_axis[1] * pos[2] - normalized_axis[2] * pos[1]) * 2 * M_PI;
+            velocity[1] = (normalized_axis[2] * pos[0] - normalized_axis[0] * pos[2]) * 2 * M_PI;
+            velocity[2] = (normalized_axis[0] * pos[1] - normalized_axis[1] * pos[0]) * 2 * M_PI;
+
+            return velocity;
+        } else {
+            static_assert(dim == 2, "Rotation is only implemented for 2D and 3d");
+
+            pos = transform(pos, t);
+            pos[0] -= m_center[0];
+            pos[1] -= m_center[1];
+
+            return {
+                -pos[1] * 2 * M_PI,
+                pos[0] * 2 * M_PI,
+            };
         }
-        axis_length = std::sqrt(axis_length);
-
-        std::array<Scalar, dim> normalized_axis;
-        for (int i = 0; i < dim; ++i) {
-            normalized_axis[i] = m_axis[i] / axis_length;
-        }
-
-        pos = transform(pos, t);
-        // Translate point to origin
-        for (int i = 0; i < dim; ++i) {
-            pos[i] -= m_center[i];
-        }
-
-        // Cross product of axis and position gives the velocity direction
-        std::array<Scalar, dim> velocity;
-        velocity[0] = (normalized_axis[1] * pos[2] - normalized_axis[2] * pos[1]) * 2 * M_PI;
-        velocity[1] = (normalized_axis[2] * pos[0] - normalized_axis[0] * pos[2]) * 2 * M_PI;
-        velocity[2] = (normalized_axis[0] * pos[1] - normalized_axis[1] * pos[0]) * 2 * M_PI;
-
-        return velocity;
     }
 
     std::array<Scalar, dim> finite_difference(std::array<Scalar, dim> pos, Scalar t) const
