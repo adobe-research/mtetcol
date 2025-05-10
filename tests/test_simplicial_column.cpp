@@ -155,6 +155,29 @@ void check_rotation(mtetcol::SimplicialColumn<dim + 1>& columns)
     check_contour(contour);
 }
 
+template <int dim>
+void check_overlapped_rotation(mtetcol::SimplicialColumn<dim + 1>& columns)
+{
+    if constexpr (dim == 2) {
+        mtetcol::ImplicitCircle base_shape(0.35, {0.25, 0.5});
+        mtetcol::Rotation<2> rotation({0.5, 0.5}, {0, 0});
+        mtetcol::SweepFunction<2> sweep_function(base_shape, rotation);
+
+        populate(columns, sweep_function, 10);
+    } else if (dim == 3) {
+        mtetcol::ImplicitSphere base_shape(0.35, {0.25, 0.5, 0.5});
+        mtetcol::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
+        mtetcol::SweepFunction<3> sweep_function(base_shape, rotation);
+
+        populate(columns, sweep_function, 10);
+    }
+
+    auto contour = columns.extract_contour(0, false);
+    // mtetcol::logger().set_level(spdlog::level::warn);
+
+    check_contour(contour);
+}
+
 TEST_CASE("simplicial_column", "[mtetcol]")
 {
     using Index = mtetcol::Index;
@@ -420,5 +443,26 @@ TEST_CASE("simplicial_column", "[mtetcol]")
 
         check_translation<2>(columns);
         check_rotation<2>(columns);
+    }
+
+    SECTION("cusp 3D")
+    {
+        // clang-format off
+        Scalar vertices[] = {
+            0.25, 0.5, 0,
+            0.5, 0.5, 0,
+            0.5, 0.75, 0,
+            0.5, 0.5, 0.25,
+        };
+        Index tets[] = {
+            0, 1, 2, 3
+        };
+        // clang-format on
+
+        mtetcol::SimplicialColumn<4> columns;
+        columns.set_vertices(std::span<Scalar>(vertices, 12));
+        columns.set_simplices(std::span<Index>(tets, 4));
+
+        check_overlapped_rotation<3>(columns);
     }
 }

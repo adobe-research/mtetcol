@@ -159,7 +159,7 @@ extract_contour_segments(
 {
     size_t num_edges = edges.size() / 2;
 
-    EdgeMap vertical_edge_map;
+    OrientedEdgeMap vertical_edge_map;
     std::vector<Index> segments;
     std::vector<SignedIndex> segment_on_edges;
     std::vector<Index> segment_on_edges_indices;
@@ -224,14 +224,25 @@ extract_contour_segments(
         merge_time_samples(v0, v1, times_0, times_1, local_indices);
         assert(local_indices.size() % 2 == 0);
 
-        size_t offset = 0;
+        size_t offset_v0 = 0;
+        size_t offset_v1 = 0;
+
+        // Note:
+        //
+        // Parity represents the function sign change for the first point of merged `local_indices`
+        // __after__ the offset.
+        //
+        // * parity == 0 means function is changing from negative to positive
+        // * parity == 1 means function is changing from positive to negative
+        //
+        // In fact, after offsetting, the initial sign for v0 should be the same as the initial sign
+        // for v1. So, parity provides information about the initial sign for both v0 and v1 after
+        // offset.
         size_t parity = 0;
 
         if (cyclic) {
             if (initial_signs[v0] != initial_signs[v1]) {
                 // Different sign at the beginning
-                offset = 1;
-
                 if (local_indices[0].vertex_index == v0) {
                     // First merged time sample is on v0.
                     // The offset will shift the samples, and the first time sample available to
@@ -240,6 +251,7 @@ extract_contour_segments(
                         parity = 1;
                     }
                     shift[ei] = -1;
+                    offset_v0 = 1;
                 } else {
                     // First merged time sample is on v1.
                     // Shifting does not change the initial sign of v0's first sample.
@@ -247,6 +259,7 @@ extract_contour_segments(
                         parity = 1;
                     }
                     shift[ei] = 1;
+                    offset_v1 = 1;
                 }
             } else {
                 if (initial_signs[v0]) {
@@ -256,20 +269,15 @@ extract_contour_segments(
         }
 
         auto add_segment = [&](Index v0, Index v1) -> Index {
-            if (v0 < v1) {
-                segments.push_back(v0);
-                segments.push_back(v1);
-            } else {
-                segments.push_back(v1);
-                segments.push_back(v0);
-            }
+            segments.push_back(v0);
+            segments.push_back(v1);
             return static_cast<Index>(segments.size() / 2 - 1);
         };
 
         size_t num_segments = local_indices.size() / 2;
         for (size_t si = 0; si < num_segments; si++) {
-            const auto& lid0 = local_indices[(si * 2 + offset) % local_indices.size()];
-            const auto& lid1 = local_indices[(si * 2 + 1 + offset) % local_indices.size()];
+            const auto& lid0 = local_indices[(si * 2 + offset_v0 + offset_v1) % local_indices.size()];
+            const auto& lid1 = local_indices[(si * 2 + 1 + offset_v0 + offset_v1) % local_indices.size()];
 
             Index p0 = contour_time_indices[lid0.vertex_index] + lid0.time_index;
             Index p1 = contour_time_indices[lid1.vertex_index] + lid1.time_index;
@@ -281,8 +289,9 @@ extract_contour_segments(
                 // Vertical segment on the same vertex
                 if (vertical_edge_map.contains({p0, p1})) {
                     seg_id = vertical_edge_map[{p0, p1}];
-                    seg_ori = segments[seg_id * 2] == p0;
-                    // assert(segments[seg_id * 2] == p0);
+                } else if (vertical_edge_map.contains({p1, p0})) {
+                    seg_id = vertical_edge_map[{p1, p0}];
+                    seg_ori = false;
                 } else {
                     vertical_edge_map[{p0, p1}] = segments.size() / 2;
                     seg_id = add_segment(p0, p1);
@@ -294,27 +303,18 @@ extract_contour_segments(
             }
             assert(seg_id != invalid_index);
 
+            // The seg_id and seg_ori should now reflect the segment [p0, p1]
+            assert(segments[seg_id * 2] == (seg_ori ? p0: p1));
+            assert(segments[seg_id * 2 + 1] == (seg_ori ? p1: p0));
+
             // Compute segment orientation
             // Pair local indices up based on even/odd parity.
-            if ((lid0.vertex_index == v0 && lid0.time_index % 2 == parity) ||
-                (lid0.vertex_index == v1 && lid0.time_index % 2 != parity)) {
-                // lid0 -> lid1
-                if (offset == 1 && si + 1 == num_segments &&
-                    lid0.vertex_index == lid1.vertex_index) {
-                    assert(contour_times[p0] > contour_times[p1]);
-                    seg_ori = seg_ori;
-                } else {
-                    seg_ori = seg_ori ? p0 < p1 : p1 < p0;
-                }
+            if ((lid0.vertex_index == v0 && (lid0.time_index + offset_v0) % 2 == parity) ||
+                (lid0.vertex_index == v1 && (lid0.time_index + offset_v1) % 2 != parity)) {
+                // lid0 -> lid1, Nothing to do.
             } else {
-                // lid1 -> lid0
-                if (offset == 1 && si + 1 == num_segments &&
-                    lid0.vertex_index == lid1.vertex_index) {
-                    assert(contour_times[p0] > contour_times[p1]);
-                    seg_ori = !seg_ori;
-                } else {
-                    seg_ori = seg_ori ? p1 < p0 : p0 < p1;
-                }
+                // lid1 -> lid0, flipping orientation
+                seg_ori = !seg_ori; //p1 < p0;
             }
 
             segment_on_edges.push_back(signed_index(seg_id, seg_ori));
@@ -360,7 +360,7 @@ auto extract_contour_cycles(
     auto register_edge = [&](Index e_id, bool ori) {
         Index seg_begin = contour_segment_on_edges_indices[e_id];
         Index seg_end = contour_segment_on_edges_indices[e_id + 1];
-        assert(seg_begin < seg_end);
+        assert(seg_begin <= seg_end);
 
         for (Index i = seg_begin; i < seg_end; i++) {
             SignedIndex si = contour_segment_on_edges[i];
