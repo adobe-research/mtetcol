@@ -33,6 +33,28 @@ struct EdgeEqual
     }
 };
 
+struct OrientedEdgeHash
+{
+    using is_transparent = void;
+    // using is_avalanching = void;
+
+    [[nodiscard]] inline auto operator()(const Edge& edge) const noexcept -> uint64_t
+    {
+        ankerl::unordered_dense::hash<uint32_t> hash_fn;
+        return std::rotl(hash_fn(edge[0]),1) ^ hash_fn(edge[1]);
+    }
+};
+
+struct OrientedEdgeEqual
+{
+    using is_transparent = void;
+
+    [[nodiscard]] inline bool operator()(const Edge& lhs, const Edge& rhs) const noexcept
+    {
+        return lhs[0] == rhs[0] && lhs[1] == rhs[1];
+    }
+};
+
 struct TriangleHash
 {
     using is_transparent = void;
@@ -64,6 +86,11 @@ struct TriangleEqual
  * Mapping from [v0, v1] to edge index.
  */
 using EdgeMap = ankerl::unordered_dense::map<Edge, Index, EdgeHash, EdgeEqual>;
+
+/**
+ * Mapping from [v0, v1] to oriented edge index.
+ */
+using OrientedEdgeMap = ankerl::unordered_dense::map<Edge, Index, OrientedEdgeHash, OrientedEdgeEqual>;
 
 /**
  * Mapping from [v0, v1, v2] to triangle index.
