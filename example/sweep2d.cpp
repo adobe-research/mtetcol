@@ -44,7 +44,8 @@ auto generate_grid(
 auto sample_time_derivative(
     mtetcol::SimplicialColumn<3>& columns,
     const mtetcol::SweepFunction<2>& sweep_function,
-    size_t num_time_samples) -> std::
+    size_t num_time_samples,
+    bool cyclic) -> std::
     tuple<std::vector<mtetcol::Scalar>, std::vector<mtetcol::Scalar>, std::vector<mtetcol::Index>>
 {
     using Index = mtetcol::Index;
@@ -70,6 +71,13 @@ auto sample_time_derivative(
         vertex_start_indices.push_back(static_cast<Index>(time_samples.size()));
     }
 
+    if (cyclic) {
+        // Ensure df(0) = df(1) for cyclic time series
+        for (size_t vi=0; vi < num_vertices; vi++) {
+            function_values[vertex_start_indices[vi]] = function_values[vertex_start_indices[vi + 1] - 1];
+        }
+    }
+
     return {time_samples, function_values, vertex_start_indices};
 }
 
@@ -80,13 +88,13 @@ mtetcol::Contour<3> circle_rotation(mtetcol::SimplicialColumn<3>& columns)
 
     constexpr size_t num_time_samples_per_vertex = 64;
 
-    std::array<Scalar, 2> center = {0.51, 0.51};
-    mtetcol::ImplicitCircle base_shape(0.1, {0.3, 0.51});
+    std::array<Scalar, 2> center = {0.50, 0.50};
+    mtetcol::ImplicitCircle base_shape(0.1, {0.3, 0.5});
     mtetcol::Rotation<2> rotation(center, {0, 0});
     mtetcol::SweepFunction<2> sweep_function(base_shape, rotation);
 
     auto [time_samples, function_values, vertex_start_indices] =
-        sample_time_derivative(columns, sweep_function, num_time_samples_per_vertex);
+        sample_time_derivative(columns, sweep_function, num_time_samples_per_vertex, true);
 
     columns.set_time_samples(
         time_samples, function_values, vertex_start_indices);

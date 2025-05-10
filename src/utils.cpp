@@ -33,6 +33,29 @@ void extract_vertex_zero_crossing(
         throw std::invalid_argument("Time samples must start at 0 and end at 1");
     }
 
+    if (cyclic) {
+        // Do some sanity check for cyclic time samples
+        if (function_values.front() != function_values.back()) {
+            Scalar f0 = function_values.front();
+            Scalar f1 = function_values.back();
+
+            if ((f0 < value && f1 >= value) || (f0 >= value && f1 < value)) {
+                logger().error(
+                    "Cyclic function have different signs at the t=0 and t=1: {}, {}",
+                    f0,
+                    f1);
+                throw std::invalid_argument(
+                    "Cyclic time samples with different function signs at the start and end");
+            } else if (f0 != f1) {
+                // Not desirable, but not a blocker.
+                logger().warn(
+                    "Cyclic function have different values at t=0 and t=1: {}, {}",
+                    f0,
+                    f1);
+            }
+        }
+    }
+
     zero_crossing_times.reserve(zero_crossing_times.size() + time_samples.size());
 
     if (!cyclic && function_values[0] >= value) {
@@ -258,6 +281,8 @@ extract_contour_segments(
                 // Vertical segment on the same vertex
                 if (vertical_edge_map.contains({p0, p1})) {
                     seg_id = vertical_edge_map[{p0, p1}];
+                    seg_ori = segments[seg_id * 2] == p0;
+                    // assert(segments[seg_id * 2] == p0);
                 } else {
                     vertical_edge_map[{p0, p1}] = segments.size() / 2;
                     seg_id = add_segment(p0, p1);
@@ -274,10 +299,22 @@ extract_contour_segments(
             if ((lid0.vertex_index == v0 && lid0.time_index % 2 == parity) ||
                 (lid0.vertex_index == v1 && lid0.time_index % 2 != parity)) {
                 // lid0 -> lid1
-                seg_ori = p0 < p1;
+                if (offset == 1 && si + 1 == num_segments &&
+                    lid0.vertex_index == lid1.vertex_index) {
+                    assert(contour_times[p0] > contour_times[p1]);
+                    seg_ori = seg_ori;
+                } else {
+                    seg_ori = seg_ori ? p0 < p1 : p1 < p0;
+                }
             } else {
                 // lid1 -> lid0
-                seg_ori = p1 < p0;
+                if (offset == 1 && si + 1 == num_segments &&
+                    lid0.vertex_index == lid1.vertex_index) {
+                    assert(contour_times[p0] > contour_times[p1]);
+                    seg_ori = !seg_ori;
+                } else {
+                    seg_ori = seg_ori ? p1 < p0 : p0 < p1;
+                }
             }
 
             segment_on_edges.push_back(signed_index(seg_id, seg_ori));
@@ -495,7 +532,7 @@ extract_contour_polyhedra(
         assert(num_cycles_per_triangle == cycles_013_end - cycles_013_begin);
         assert(num_cycles_per_triangle == cycles_032_end - cycles_032_begin);
 
-        for (Index i=0; i<num_cycles_per_triangle; i++) {
+        for (Index i = 0; i < num_cycles_per_triangle; i++) {
             Index cycle_021_id = cycles_021_begin + i;
             Index cycle_123_id = cycles_123_begin + i;
             Index cycle_013_id = cycles_013_begin + i;

@@ -4,8 +4,11 @@
 #include <cmath>
 #include <vector>
 
+#include <mtetcol/implicit_function.h>
 #include <mtetcol/logger.h>
 #include <mtetcol/simplicial_column.h>
+#include <mtetcol/sweep_function.h>
+#include <mtetcol/transform.h>
 
 TEST_CASE("simplicial_column", "[mtetcol]")
 {
@@ -86,6 +89,24 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         finite_difference(sphere_rotation, sphere_rotation_time_derivative, x, y, z, t);
     };
 
+    auto circle_rotation = [](Scalar x, Scalar y, Scalar t) -> Scalar {
+        std::array<Scalar, 2> center = {0.50, 0.50};
+        mtetcol::ImplicitCircle base_shape(0.1, {0.3, 0.5});
+        mtetcol::Rotation<2> rotation(center, {0, 0});
+        mtetcol::SweepFunction<2> sweep_function(base_shape, rotation);
+
+        return sweep_function.value({x, y}, t);
+    };
+
+    auto circle_rotation_time_derivative = [](Scalar x, Scalar y, Scalar t) -> Scalar {
+        std::array<Scalar, 2> center = {0.50, 0.50};
+        mtetcol::ImplicitCircle base_shape(0.1, {0.3, 0.5});
+        mtetcol::Rotation<2> rotation(center, {0, 0});
+        mtetcol::SweepFunction<2> sweep_function(base_shape, rotation);
+
+        return sweep_function.time_derivative({x, y}, t);
+    };
+
     auto populate_columns = [&](mtetcol::SimplicialColumn<4>& columns,
                                 size_t num_time_samples_per_vertex,
                                 auto& f,
@@ -120,7 +141,46 @@ TEST_CASE("simplicial_column", "[mtetcol]")
             std::span<Index>(start_indices.data(), start_indices.size()));
     };
 
-    auto check_contour = [&](mtetcol::Contour<4>& contour) {
+    auto populate_columns_2D = [&](mtetcol::SimplicialColumn<3>& columns,
+                                  size_t num_time_samples_per_vertex,
+                                  auto& f,
+                                  auto& df, bool cyclic) {
+        auto vertices = columns.get_spatial_vertices();
+        size_t num_vertices = vertices.size() / 2;
+
+        std::vector<Scalar> time_samples;
+        std::vector<Scalar> function_values;
+        std::vector<Index> start_indices;
+        time_samples.reserve(num_time_samples_per_vertex * num_vertices);
+        function_values.reserve(num_time_samples_per_vertex * num_vertices);
+        start_indices.reserve(num_vertices + 1);
+        start_indices.push_back(0);
+
+        for (size_t i = 0; i < num_vertices; i++) {
+            Scalar x = vertices[i * 2];
+            Scalar y = vertices[i * 2 + 1];
+            for (size_t j = 0; j < num_time_samples_per_vertex; j++) {
+                Scalar t = static_cast<Scalar>(j) / (num_time_samples_per_vertex - 1);
+                time_samples.push_back(t);
+                function_values.push_back(df(x, y, t));
+            }
+            start_indices.push_back(static_cast<Index>(time_samples.size()));
+        }
+
+        if (cyclic) {
+            for (size_t i=0; i<num_vertices; i++) {
+                // Ensure df(0) = df(1) for cyclic time series
+                function_values[start_indices[i]] = function_values[start_indices[i+1]-1];
+            }
+        }
+
+        columns.set_time_samples(
+            std::span<Scalar>(time_samples.data(), time_samples.size()),
+            std::span<Scalar>(function_values.data(), function_values.size()),
+            std::span<Index>(start_indices.data(), start_indices.size()));
+    };
+
+    auto check_contour = [&](auto& contour) {
         size_t num_vertices = contour.get_num_vertices();
         size_t num_segments = contour.get_num_segments();
         size_t num_cycles = contour.get_num_cycles();
@@ -188,6 +248,22 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         auto cyclic_contour = columns.extract_contour(0, true);
         check_contour(cyclic_contour);
         // mtetcol::logger().set_level(spdlog::level::warn);
+    };
+
+    auto check_circle_rotation = [&](mtetcol::SimplicialColumn<3>& columns,
+                                     size_t num_time_samples_per_vertex) {
+        populate_columns_2D(
+            columns,
+            num_time_samples_per_vertex,
+            circle_rotation,
+            circle_rotation_time_derivative,
+            true);
+        auto contour = columns.extract_contour(0, false);
+        check_contour(contour);
+
+        // mtetcol::logger().set_level(spdlog::level::debug);
+        auto cyclic_contour = columns.extract_contour(0, true);
+        check_contour(cyclic_contour);
     };
 
     SECTION("Derivative test")
@@ -342,6 +418,8 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         REQUIRE(columns.get_num_spatial_vertices() == 3);
         REQUIRE(columns.get_num_spatial_edges() == 3);
         REQUIRE(columns.get_num_spatial_triangles() == 1);
+
+        check_circle_rotation(columns, 10);
     }
 
     SECTION("Two triangle sharing a vertex")
@@ -425,5 +503,29 @@ TEST_CASE("simplicial_column", "[mtetcol]")
         mtetcol::Contour<3> contour = columns.extract_contour(0, false);
         REQUIRE(contour.get_num_vertices() == 5);
         REQUIRE(contour.get_num_segments() == 4);
+    }
+
+    SECTION("Singularity 2D")
+    {
+        // clang-format off
+        Scalar vertices[] = {
+            0, 0.5,
+            0.25, 0.5,
+            0, 0.75,
+        };
+        Index tris[] = {
+            0, 1, 2,
+        };
+        // clang-format on
+
+        mtetcol::SimplicialColumn<3> columns;
+        columns.set_vertices(std::span<Scalar>(vertices, 6));
+        columns.set_simplices(std::span<Index>(tris, 3));
+
+        REQUIRE(columns.get_num_spatial_vertices() == 3);
+        REQUIRE(columns.get_num_spatial_edges() == 3);
+        REQUIRE(columns.get_num_spatial_triangles() == 1);
+
+        check_circle_rotation(columns, 4);
     }
 }
