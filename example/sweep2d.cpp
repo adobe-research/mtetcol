@@ -89,7 +89,7 @@ mtetcol::Contour<3> circle_rotation(mtetcol::SimplicialColumn<3>& columns)
     constexpr size_t num_time_samples_per_vertex = 64;
 
     std::array<Scalar, 2> center = {0.50, 0.50};
-    mtetcol::ImplicitCircle base_shape(0.1, {0.3, 0.5});
+    mtetcol::ImplicitCircle base_shape(0.3, {0.4, 0.5});
     mtetcol::Rotation<2> rotation(center, {0, 0});
     mtetcol::SweepFunction<2> sweep_function(base_shape, rotation);
 
