@@ -123,7 +123,7 @@ mtetcol::Contour<4> sphere_rotation(mtetcol::SimplicialColumn<4>& columns)
 
     constexpr size_t num_time_samples_per_vertex = 10;
 
-    mtetcol::ImplicitSphere base_shape(0.35, {0.25, 0.5, 0.5});
+    mtetcol::ImplicitSphere base_shape(0.3, {0.4, 0.5, 0.5});
     mtetcol::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
     mtetcol::SweepFunction<3> sweep_function(base_shape, rotation);
 
