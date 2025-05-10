@@ -7,8 +7,8 @@
 #include <mtetcol/transform.h>
 
 #include <ankerl/unordered_dense.h>
-#include <mtet/io.h>
 #include <mtet/grid.h>
+#include <mtet/io.h>
 
 #include <chrono>
 
@@ -47,7 +47,8 @@ std::tuple<std::vector<Scalar>, std::vector<Index>> generate_simpicial_column(
 auto sample_time_derivative(
     mtetcol::SimplicialColumn<4>& columns,
     const mtetcol::SweepFunction<3>& sweep_function,
-    size_t num_time_samples) -> std::
+    size_t num_time_samples,
+    bool cyclic = false) -> std::
     tuple<std::vector<mtetcol::Scalar>, std::vector<mtetcol::Scalar>, std::vector<mtetcol::Index>>
 {
     using Index = mtetcol::Index;
@@ -73,6 +74,14 @@ auto sample_time_derivative(
         vertex_start_indices.push_back(static_cast<Index>(time_samples.size()));
     }
 
+    if (cyclic) {
+        // For cyclic time samples, we need to set the last time sample to the first one
+        for (size_t vi = 0; vi < num_vertices; vi++) {
+            function_values[vertex_start_indices[vi + 1] - 1] =
+                function_values[vertex_start_indices[vi]];
+        }
+    }
+
     return {time_samples, function_values, vertex_start_indices};
 }
 
@@ -90,8 +99,7 @@ mtetcol::Contour<4> sphere_translation(mtetcol::SimplicialColumn<4>& columns)
     auto [time_samples, function_values, vertex_start_indices] =
         sample_time_derivative(columns, sweep_function, num_time_samples_per_vertex);
 
-    columns.set_time_samples(
-        time_samples, function_values, vertex_start_indices);
+    columns.set_time_samples(time_samples, function_values, vertex_start_indices);
 
     auto contour = columns.extract_contour(0.0, false);
     contour.triangulate_cycles();
@@ -115,15 +123,14 @@ mtetcol::Contour<4> sphere_rotation(mtetcol::SimplicialColumn<4>& columns)
 
     constexpr size_t num_time_samples_per_vertex = 10;
 
-    mtetcol::ImplicitSphere base_shape(0.2, {0.25, 0.5, 0.5});
+    mtetcol::ImplicitSphere base_shape(0.35, {0.25, 0.5, 0.5});
     mtetcol::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
     mtetcol::SweepFunction<3> sweep_function(base_shape, rotation);
 
     auto [time_samples, function_values, vertex_start_indices] =
-        sample_time_derivative(columns, sweep_function, num_time_samples_per_vertex);
+        sample_time_derivative(columns, sweep_function, num_time_samples_per_vertex, true);
 
-    columns.set_time_samples(
-        time_samples, function_values, vertex_start_indices);
+    columns.set_time_samples(time_samples, function_values, vertex_start_indices);
 
     auto contour = columns.extract_contour(0.0, true);
     contour.triangulate_cycles();
@@ -158,8 +165,7 @@ mtetcol::Contour<4> torus_flip(mtetcol::SimplicialColumn<4>& columns)
 
     auto t1 = std::chrono::high_resolution_clock::now();
 
-    columns.set_time_samples(
-        time_samples, function_values, vertex_start_indices);
+    columns.set_time_samples(time_samples, function_values, vertex_start_indices);
 
     auto t2 = std::chrono::high_resolution_clock::now();
 
@@ -184,18 +190,24 @@ mtetcol::Contour<4> torus_flip(mtetcol::SimplicialColumn<4>& columns)
     auto result = contour.isocontour(function_values);
     auto t6 = std::chrono::high_resolution_clock::now();
 
-    mtetcol::logger().info("sample_time_derivative: {} ms",
-                  std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
-    mtetcol::logger().info("set_time_samples: {} ms",
-                  std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
-    mtetcol::logger().info("extract_contour: {} ms",
-                  std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count());
-    mtetcol::logger().info("triangulate_cycles: {} ms",
-                  std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count());
-    mtetcol::logger().info("initialize function value: {} ms",
-                  std::chrono::duration_cast<std::chrono::milliseconds>(t5 - t4).count());
-    mtetcol::logger().info("isocontour: {} ms",
-                  std::chrono::duration_cast<std::chrono::milliseconds>(t6 - t5).count());
+    mtetcol::logger().info(
+        "sample_time_derivative: {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+    mtetcol::logger().info(
+        "set_time_samples: {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
+    mtetcol::logger().info(
+        "extract_contour: {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count());
+    mtetcol::logger().info(
+        "triangulate_cycles: {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count());
+    mtetcol::logger().info(
+        "initialize function value: {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t5 - t4).count());
+    mtetcol::logger().info(
+        "isocontour: {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t6 - t5).count());
 
     return result;
 }
@@ -204,7 +216,7 @@ int main(int argc, char** argv)
 {
     mtetcol::logger().set_level(spdlog::level::debug);
 
-    constexpr size_t resolution = 67;
+    constexpr size_t resolution = 64;
     auto tet_mesh = mtet::generate_tet_grid(
         {resolution, resolution, resolution},
         {0, 0, 0},
@@ -218,8 +230,8 @@ int main(int argc, char** argv)
     columns.set_simplices(tets);
 
     // auto isocontour = sphere_translation(columns);
-    // auto isocontour = sphere_rotation(columns);
-    auto isocontour = torus_flip(columns);
+    auto isocontour = sphere_rotation(columns);
+    // auto isocontour = torus_flip(columns);
 
     isocontour.triangulate_cycles();
     mtetcol::save_contour("contour.msh", isocontour);
