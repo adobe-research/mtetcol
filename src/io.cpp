@@ -121,7 +121,7 @@ mshio::MshSpec generate_spec(const Contour<3>& contour)
         node_block.tags.push_back(i + 1);
         node_block.data.push_back(pos[0]);
         node_block.data.push_back(pos[1]);
-        node_block.data.push_back(0);
+        node_block.data.push_back(pos[2]);
     }
 
     // Initialize elements
@@ -210,7 +210,7 @@ void save_contour(
 
         for (size_t i = 0; i < num_vertices; i++) {
             auto pos = contour.get_vertex(i);
-            fout << "v " << pos[0] << " " << pos[1] << " 0" << std::endl;
+            fout << "v " << pos[0] << " " << pos[1] << " " << pos[2] << std::endl;
         }
 
         for (size_t i = 0; i < num_segments; i++) {
