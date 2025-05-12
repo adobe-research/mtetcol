@@ -245,10 +245,9 @@ void Contour<3>::triangulate_cycles()
     map_cycle_regularity(cycle_to_triangle_map, m_cycle_is_regular);
 
 #ifndef NDEBUG
-    size_t num_cycles = get_num_cycles();
-    for (size_t i = 0; i < num_cycles; i++) {
-        check_cycle(i);
-    }
+    check_all_segments();
+    check_all_cycles();
+    check_all_polyhedra();
 #endif
 }
 
@@ -256,6 +255,7 @@ template <>
 void Contour<4>::triangulate_cycles()
 {
 #ifndef NDEBUG
+    check_all_segments();
     check_all_cycles();
     check_all_polyhedra();
 #endif
@@ -300,10 +300,9 @@ void Contour<4>::triangulate_cycles()
     // Polyhedron regularity is unchnaged.
 
 #ifndef NDEBUG
-    num_polyhedra = get_num_polyhedra();
-    for (size_t i = 0; i < num_polyhedra; i++) {
-        check_polyhedron(i);
-    }
+    check_all_segments();
+    check_all_cycles();
+    check_all_polyhedra();
 #endif
 }
 
@@ -317,6 +316,13 @@ Contour<3> Contour<3>::isocontour(std::span<Scalar> function_values) const
         compute_zero_crossing_vertices(*this, function_values, result);
 
     compute_zero_crossing_segments(*this, function_values, zero_crossing_vertices, result);
+
+#ifndef NDEBUG
+    result.check_all_segments();
+    result.check_all_cycles();
+    result.check_all_polyhedra();
+#endif
+
     return result;
 }
 
@@ -356,10 +362,9 @@ Contour<4> Contour<4>::isocontour(std::span<Scalar> function_values) const
 
 
 #ifndef NDEBUG
-    size_t out_num_polyhedra = result.get_num_polyhedra();
-    for (size_t i = 0; i < out_num_polyhedra; i++) {
-        result.check_polyhedron(i);
-    }
+    result.check_all_segments();
+    result.check_all_cycles();
+    result.check_all_polyhedra();
 #endif
 
     return result;

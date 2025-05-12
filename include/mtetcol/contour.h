@@ -299,6 +299,13 @@ public:
     Contour<dim> isocontour(std::span<Scalar> function_values) const;
 
 private:
+    void check_all_segments() const {
+        const size_t num_vertices = get_num_vertices();
+        for (auto vi : m_segments) {
+            assert(vi >= 0 && vi < num_vertices);
+        }
+    }
+
     /**
      * @brief Check if the cycle is valid.
      *
