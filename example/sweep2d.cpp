@@ -137,6 +137,7 @@ mtetcol::Contour<3> lemniscate_of_bernoulli(mtetcol::SimplicialColumn<3>& column
 
     auto contour = columns.extract_contour(0.0, true);
     contour.triangulate_cycles();
+    mtetcol::save_contour("contour_grid2d.msh", contour);
 
     size_t num_contour_vertices = contour.get_num_vertices();
     function_values.clear();

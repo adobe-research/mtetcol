@@ -112,12 +112,14 @@ public:
      * either in its original direction or reversed.
      *
      * @param cycle Span of segment signed indices that form the cycle
+     * @param is_regular True if the cycle is regular, false otherwise
      */
-    void add_cycle(std::span<const SignedIndex> cycle)
+    void add_cycle(std::span<const SignedIndex> cycle, bool is_regular = true)
     {
         std::copy(cycle.begin(), cycle.end(), std::back_inserter(m_cycles));
         m_cycle_start_indices.push_back(m_cycles.size());
         assert(check_cycle(get_num_cycles() - 1));
+        m_cycle_is_regular.push_back(is_regular);
     }
 
     /**
@@ -127,12 +129,14 @@ public:
      * either in its original direction or reversed.
      *
      * @param cycle Span of segment signed indices that form the cycle
+     * @param is_regular True if the cycle is regular, false otherwise
      */
-    void add_cycle(std::initializer_list<SignedIndex> cycle)
+    void add_cycle(std::initializer_list<SignedIndex> cycle, bool is_regular = true)
     {
         std::copy(cycle.begin(), cycle.end(), std::back_inserter(m_cycles));
         m_cycle_start_indices.push_back(m_cycles.size());
         assert(check_cycle(get_num_cycles() - 1));
+        m_cycle_is_regular.push_back(is_regular);
     }
 
     /**
@@ -157,6 +161,31 @@ public:
     }
 
     /**
+     * @brief Check if a cycle is regular
+     *
+     * @param cid The index of the cycle to check
+     *
+     * @return bool True if the cycle is regular, false otherwise
+     */
+    bool is_cycle_regular(Index cid) const
+    {
+        if (cid >= m_cycle_is_regular.size()) {
+            throw std::out_of_range("Cycle ID out of range");
+        }
+        return m_cycle_is_regular[cid];
+    }
+
+    /**
+     * @brief Retrieves the regularity status of all cycles in the contour
+     *
+     * @return std::vector<bool> A vector indicating whether each cycle is regular
+     */
+    const std::vector<bool>& get_cycle_is_regular() const
+    {
+        return m_cycle_is_regular;
+    }
+
+    /**
      * @brief Retrieves the number of cycles in the contour
      *
      * @return size_t The number of cycles
@@ -173,12 +202,14 @@ public:
      * A polyhedron is defined by a collection of oriented cycles that form its faces.
      *
      * @param polyhedron Span of cycle indices that form the polyhedron faces
+     * @param is_regular True if the polyhedron is regular, false otherwise
      */
-    void add_polyhedron(std::span<const SignedIndex> polyhedron)
+    void add_polyhedron(std::span<const SignedIndex> polyhedron, bool is_regular = true)
     {
         std::copy(polyhedron.begin(), polyhedron.end(), std::back_inserter(m_polyhedra));
         m_polyhedron_start_indices.push_back(m_polyhedra.size());
         assert(check_polyhedron(get_num_polyhedra() - 1));
+        m_polyhedron_is_regular.push_back(is_regular);
     }
 
     /**
@@ -187,12 +218,14 @@ public:
      * A polyhedron is defined by a collection of oriented cycles that form its faces.
      *
      * @param polyhedron Span of cycle indices that form the polyhedron faces
+     * @param is_regular True if the polyhedron is regular, false otherwise
      */
-    void add_polyhedron(std::initializer_list<SignedIndex> polyhedron)
+    void add_polyhedron(std::initializer_list<SignedIndex> polyhedron, bool is_regular = true)
     {
         std::copy(polyhedron.begin(), polyhedron.end(), std::back_inserter(m_polyhedra));
         m_polyhedron_start_indices.push_back(m_polyhedra.size());
         assert(check_polyhedron(get_num_polyhedra() - 1));
+        m_polyhedron_is_regular.push_back(is_regular);
     }
 
     /**
@@ -213,6 +246,31 @@ public:
         Index end = m_polyhedron_start_indices[poly_id + 1];
 
         return std::span<const SignedIndex>(m_polyhedra.data() + start, end - start);
+    }
+
+    /**
+     * @brief Check if a polyhedron is regular
+     *
+     * @param poly_id The index of the polyhedron to check
+     *
+     * @return bool True if the polyhedron is regular, false otherwise
+     */
+    bool is_polyhedron_regular(Index poly_id) const
+    {
+        if (poly_id >= m_polyhedron_is_regular.size()) {
+            throw std::out_of_range("Polyhedron ID out of range");
+        }
+        return m_polyhedron_is_regular[poly_id];
+    }
+
+    /**
+     * @brief Retrieves the regularity status of all polyhedra in the contour
+     *
+     * @return std::vector<bool> A vector indicating whether each polyhedron is regular
+     */
+    const std::vector<bool>& get_polyhedron_is_regular() const
+    {
+        return m_polyhedron_is_regular;
     }
 
     /**
@@ -284,6 +342,7 @@ private:
     void check_all_cycles() const
     {
         size_t num_cycles = get_num_cycles();
+        assert(num_cycles == m_cycle_is_regular.size());
         for (size_t ci=0; ci < num_cycles; ci++) {
             check_cycle(ci);
         }
@@ -332,6 +391,7 @@ private:
     void check_all_polyhedra() const
     {
         size_t num_polyhedra = get_num_polyhedra();
+        assert(num_polyhedra == m_polyhedron_is_regular.size());
         for (size_t pi=0; pi < num_polyhedra; pi++) {
             check_polyhedron(pi);
         }
@@ -360,6 +420,7 @@ private:
      */
     std::vector<SignedIndex> m_cycles;
     std::vector<Index> m_cycle_start_indices = {0};
+    std::vector<bool> m_cycle_is_regular;
 
     /**
      * @brief Contour polyhedra.
@@ -368,6 +429,7 @@ private:
      */
     std::vector<SignedIndex> m_polyhedra;
     std::vector<Index> m_polyhedron_start_indices = {0};
+    std::vector<bool> m_polyhedron_is_regular;
 };
 
 } // namespace mtetcol

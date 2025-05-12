@@ -12,7 +12,7 @@ void print_polyhedron(const Contour<4>& contour, Index polyhedron_id)
     logger().info("Polyhedron {}", polyhedron_id);
     auto cycles = contour.get_polyhedron(polyhedron_id);
     size_t cycle_size = cycles.size();
-    for (size_t i=0; i< cycle_size; i++) {
+    for (size_t i = 0; i < cycle_size; i++) {
         auto ci = cycles[i];
         Index cycle_id = index(ci);
         bool cycle_ori = orientation(ci);
@@ -52,6 +52,7 @@ std::vector<Index> triangulate(
         return {v0, v1};
     };
 
+    logger().info("num cycles: {}", num_cycles);
     for (size_t i = 0; i < num_cycles; i++) {
         auto start = cycle_indices[i];
         auto end = cycle_indices[i + 1];
@@ -110,6 +111,8 @@ std::vector<Index> triangulate(
 
     std::swap(cycles, triangle_cycles);
     std::swap(cycle_indices, triangle_cycle_indices);
+
+    logger().info("cycle_to_triangle_map size: {}", cycle_to_triangle_map.size());
 
     return cycle_to_triangle_map;
 }
@@ -209,14 +212,37 @@ std::vector<Index> compute_zero_crossing_segments(
     return zero_crossing_segment_indices;
 }
 
+void map_cycle_regularity(
+    const std::vector<Index>& cycle_to_triangle_map,
+    std::vector<bool>& cycle_is_regular)
+{
+    std::vector<bool> updated_cycle_is_regular;
+    updated_cycle_is_regular.reserve(cycle_to_triangle_map.back());
+
+    size_t num_old_cycles = cycle_to_triangle_map.size() - 1;
+    assert(num_old_cycles == cycle_is_regular.size());
+
+    for (size_t i = 0; i < num_old_cycles; i++) {
+        Index triangle_start = cycle_to_triangle_map[i];
+        Index triangle_end = cycle_to_triangle_map[i + 1];
+        updated_cycle_is_regular.insert(
+            updated_cycle_is_regular.end(),
+            triangle_end - triangle_start,
+            cycle_is_regular[i]);
+    }
+    std::swap(cycle_is_regular, updated_cycle_is_regular);
+}
+
 
 } // namespace
 
 template <>
 void Contour<3>::triangulate_cycles()
 {
-    [[maybe_unused]] auto cycle_to_triangle_map =
-        triangulate(m_segments, m_cycles, m_cycle_start_indices);
+    auto cycle_to_triangle_map = triangulate(m_segments, m_cycles, m_cycle_start_indices);
+
+    // Update the cycle_is_regular vector
+    map_cycle_regularity(cycle_to_triangle_map, m_cycle_is_regular);
 
 #ifndef NDEBUG
     size_t num_cycles = get_num_cycles();
@@ -235,6 +261,9 @@ void Contour<4>::triangulate_cycles()
 #endif
 
     auto cycle_to_triangle_map = triangulate(m_segments, m_cycles, m_cycle_start_indices);
+
+    // Update the cycle_is_regular vector
+    map_cycle_regularity(cycle_to_triangle_map, m_cycle_is_regular);
 
 #ifndef NDEBUG
     check_all_cycles();
@@ -267,6 +296,8 @@ void Contour<4>::triangulate_cycles()
 
     std::swap(m_polyhedra, updated_polyhedra);
     std::swap(m_polyhedron_start_indices, updated_polyhedron_start_indices);
+
+    // Polyhedron regularity is unchnaged.
 
 #ifndef NDEBUG
     num_polyhedra = get_num_polyhedra();
@@ -315,7 +346,12 @@ Contour<4> Contour<4>::isocontour(std::span<Scalar> function_values) const
                 disjoint_cycles.register_segment(signed_index(seg_id, cycle_ori));
             }
         }
+        size_t num_existing_cycles = result.m_cycle_start_indices.size();
         disjoint_cycles.extract_cycles(result.m_cycles, result.m_cycle_start_indices);
+
+        for (size_t j=num_existing_cycles; j < result.m_cycle_start_indices.size(); j++) {
+            result.m_cycle_is_regular.push_back(m_polyhedron_is_regular[i]);
+        }
     }
 
 

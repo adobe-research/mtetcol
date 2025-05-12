@@ -64,6 +64,17 @@ Scalar value = 0.0;
 bool cyclic = false;
 auto contour = columns.extract_contour(value, cyclic);
 
+// The output contour is a 3D polyhedral mesh embedded in a 4D space-time domain.
+// A cycle or polyhedron in the contour is considered "regular" if its spatial projection forms a
+// non-degenerate simplex.
+// 
+// To check if a cycle/polyhedron is regular:
+if (contour.is_cycle_regular(cycle_index)) { ... }
+if (contour.is_polyhedron_regular(polyhedron_index)) { ... }
+
+// The cycle/polyhedron regularity flag is computed only when extracting from simplicial columns.
+// Subsequent operations, such as `triangulate_cycles` and `isocontour`, simply propagate these flags.
+
 // Triangulate cycles if needed
 auto triangulated_contours = columns.triangulate_cycles(contour);
 

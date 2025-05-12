@@ -98,7 +98,7 @@ mshio::MshSpec generate_spec(const Contour<3>& contour)
     size_t num_segments = contour.get_num_segments();
 
     mshio::MshSpec spec;
-    spec.mesh_format.file_type = 1; // binary
+    spec.mesh_format.file_type = 0; // binary
 
     // Initialize nodes
     auto& nodes = spec.nodes;
@@ -187,6 +187,25 @@ void add_scalar_field(mshio::MshSpec& spec, std::string name, std::span<Scalar> 
     spec.node_data.push_back(std::move(node_data));
 }
 
+void add_boolean_field(mshio::MshSpec& spec, std::string name, const std::vector<bool>& field)
+{
+    mshio::Data element_data;
+    element_data.header.string_tags.push_back(name);
+    element_data.header.int_tags.push_back(0);
+    element_data.header.int_tags.push_back(1);
+    element_data.header.int_tags.push_back(field.size());
+
+    auto& entries = element_data.entries;
+    entries.resize(field.size());
+    for (size_t i = 0; i < field.size(); i++) {
+        auto& entry = entries[i];
+        entry.tag = i + 1;
+        entry.data = {field[i] ? 1.0 : 0.0};
+    }
+
+    spec.element_data.push_back(std::move(element_data));
+}
+
 } // namespace
 
 void save_contour(
@@ -228,6 +247,7 @@ void save_contour(
     logger().info("Saving contour to {}", filename);
     if (filename.ends_with(".msh")) {
         auto spec = generate_spec(contour);
+        add_boolean_field(spec, "is_regular", contour.get_cycle_is_regular());
         if (!function_values.empty()) {
             assert(function_values.size() == contour.get_num_vertices());
             add_scalar_field(spec, "values", function_values);

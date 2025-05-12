@@ -216,7 +216,7 @@ int main(int argc, char** argv)
 {
     mtetcol::logger().set_level(spdlog::level::debug);
 
-    constexpr size_t resolution = 63;
+    constexpr size_t resolution = 64;
     auto tet_mesh = mtet::generate_tet_grid(
         {resolution, resolution, resolution},
         {0, 0, 0},

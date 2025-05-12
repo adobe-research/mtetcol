@@ -177,6 +177,8 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
     size_t num_segments = contour_segments.size() / 2;
     size_t num_cycles = contour_cycle_indices.size() - 1;
     size_t num_polyhedra = contour_polyhedron_indices.size() - 1;
+    std::vector<Index> contour_to_spatial_vertex_map;
+    contour_to_spatial_vertex_map.reserve(contour_times.size());
 
     for (size_t i = 0; i < num_contour_vertices; i++) {
         std::span<Scalar> position = m_vertices.subspan(i * 3, 3);
@@ -185,6 +187,7 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
             contour_time_indices[i + 1] - contour_time_indices[i]);
         for (auto t : time_samples) {
             contour.add_vertex({position[0], position[1], position[2], t});
+            contour_to_spatial_vertex_map.push_back(i);
         }
     }
 
@@ -193,15 +196,40 @@ Contour<4> SimplicialColumn<4>::extract_contour(Scalar value, bool cyclic) const
     }
 
     for (size_t i = 0; i < num_cycles; i++) {
-        contour.add_cycle(std::span<SignedIndex>(
+        auto cycle = std::span<SignedIndex>(
             contour_cycles.data() + contour_cycle_indices[i],
-            contour_cycle_indices[i + 1] - contour_cycle_indices[i]));
+            contour_cycle_indices[i + 1] - contour_cycle_indices[i]);
+        bool is_regular = cycle.size() == 3;
+        if (is_regular) {
+            std::array<Index, 3> cycle_vertices;
+            size_t count = 0;
+            for (auto si : cycle) {
+                Index seg_index = index(si);
+                bool seg_ori = orientation(si);
+                Index v0 =
+                    seg_ori ? contour_segments[seg_index * 2] : contour_segments[seg_index * 2 + 1];
+                cycle_vertices[count++] = contour_to_spatial_vertex_map[v0];
+            }
+            if (cycle_vertices[0] == cycle_vertices[1] || cycle_vertices[1] == cycle_vertices[2] ||
+                cycle_vertices[0] == cycle_vertices[2]) {
+                is_regular = false;
+            }
+        }
+
+        contour.add_cycle(cycle, is_regular);
     }
 
     for (size_t i = 0; i < num_polyhedra; i++) {
-        contour.add_polyhedron(std::span<SignedIndex>(
+        bool is_regular = true;
+        std::span<SignedIndex> polyhedron(
             contour_polyhedra.data() + contour_polyhedron_indices[i],
-            contour_polyhedron_indices[i + 1] - contour_polyhedron_indices[i]));
+            contour_polyhedron_indices[i + 1] - contour_polyhedron_indices[i]);
+        for (auto ci : polyhedron) {
+            Index cycle_index = index(ci);
+            is_regular = is_regular && contour.is_cycle_regular(cycle_index);
+        }
+
+        contour.add_polyhedron(polyhedron, is_regular);
     }
 
     return contour;
@@ -252,6 +280,8 @@ Contour<3> SimplicialColumn<3>::extract_contour(Scalar value, bool cyclic) const
     size_t num_contour_vertices = contour_time_indices.size() - 1;
     size_t num_segments = contour_segments.size() / 2;
     size_t num_cycles = contour_cycle_indices.size() - 1;
+    std::vector<Index> contour_to_spatial_vertex_map;
+    contour_to_spatial_vertex_map.reserve(contour_times.size());
 
     for (size_t i = 0; i < num_contour_vertices; i++) {
         std::span<Scalar> position = m_vertices.subspan(i * 2, 2);
@@ -260,6 +290,7 @@ Contour<3> SimplicialColumn<3>::extract_contour(Scalar value, bool cyclic) const
             contour_time_indices[i + 1] - contour_time_indices[i]);
         for (auto t : time_samples) {
             contour.add_vertex({position[0], position[1], t});
+            contour_to_spatial_vertex_map.push_back(i);
         }
     }
 
@@ -268,9 +299,27 @@ Contour<3> SimplicialColumn<3>::extract_contour(Scalar value, bool cyclic) const
     }
 
     for (size_t i = 0; i < num_cycles; i++) {
-        contour.add_cycle(std::span<SignedIndex>(
+        auto cycle = std::span<SignedIndex>(
             contour_cycles.data() + contour_cycle_indices[i],
-            contour_cycle_indices[i + 1] - contour_cycle_indices[i]));
+            contour_cycle_indices[i + 1] - contour_cycle_indices[i]);
+        bool is_regular = cycle.size() == 3;
+        if (is_regular) {
+            std::array<Index, 3> cycle_vertices;
+            size_t count = 0;
+            for (auto si : cycle) {
+                Index seg_index = index(si);
+                bool seg_ori = orientation(si);
+                Index v0 =
+                    seg_ori ? contour_segments[seg_index * 2] : contour_segments[seg_index * 2 + 1];
+                cycle_vertices[count++] = contour_to_spatial_vertex_map[v0];
+            }
+            if (cycle_vertices[0] == cycle_vertices[1] || cycle_vertices[1] == cycle_vertices[2] ||
+                cycle_vertices[0] == cycle_vertices[2]) {
+                is_regular = false;
+            }
+        }
+
+        contour.add_cycle(cycle, is_regular);
     }
 
     return contour;
