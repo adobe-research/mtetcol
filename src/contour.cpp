@@ -1,6 +1,8 @@
 #include <mtetcol/contour.h>
 #include <mtetcol/disjoint_cycles.h>
 
+#include "hashmap.h"
+
 #include <SmallVector.h>
 
 namespace mtetcol {
@@ -33,6 +35,8 @@ std::vector<Index> triangulate(
 {
     size_t num_cycles = cycle_indices.size() - 1;
 
+    OrientedEdgeMap diagonal_map;
+
     std::vector<SignedIndex> triangle_cycles;
     std::vector<Index> triangle_cycle_indices;
     std::vector<Index> cycle_to_triangle_map;
@@ -47,9 +51,22 @@ std::vector<Index> triangulate(
         Index seg_id = index(si);
         bool seg_ori = orientation(si);
 
+        assert(seg_id * 2 + 1 < segments.size());
         Index v0 = segments[seg_id * 2 + (seg_ori ? 0 : 1)];
         Index v1 = segments[seg_id * 2 + (seg_ori ? 1 : 0)];
         return {v0, v1};
+    };
+
+    auto add_diagnonal = [&](Index v0, Index v1) {
+        Index num_segments = segments.size() / 2;
+        auto [itr, inserted] = diagonal_map.try_emplace({v0, v1}, num_segments);
+        Index diag_index = itr->second;
+        if (inserted) {
+            assert(diag_index == num_segments);
+            segments.push_back(v0);
+            segments.push_back(v1);
+        }
+        return diag_index;
     };
 
     for (size_t i = 0; i < num_cycles; i++) {
@@ -72,8 +89,7 @@ std::vector<Index> triangulate(
             // This ensures the same cycle from different polyhedra is triangulated consistently.
             size_t cycle_start_index = 0;
             for (size_t j = 0; j < num_segments_in_cycle; j++) {
-                auto si = cycle[j];
-                if (get_segment(si)[0] < get_segment(cycles[cycle_start_index])[0]) {
+                if (get_segment(cycle[j])[0] < get_segment(cycle[cycle_start_index])[0]) {
                     cycle_start_index = j;
                 }
             }
@@ -94,19 +110,17 @@ std::vector<Index> triangulate(
                 si_curr = si;
 
                 if (j == 1) {
-                    segments.push_back(v0);
-                    segments.push_back(segment[1]);
-
+                    assert(v0 < segment[1]);
+                    Index diag_index = add_diagnonal(v0, segment[1]);
                     si_prev = cycle[cycle_start_index];
-                    si_next = signed_index(segments.size() / 2 - 1, false);
+                    si_next = signed_index(diag_index, false);
                 } else if (j + 2 == num_segments_in_cycle) {
                     si_next = cycle
                         [(cycle_start_index + num_segments_in_cycle - 1) % num_segments_in_cycle];
                 } else {
-                    segments.push_back(v0);
-                    segments.push_back(segment[1]);
-
-                    si_next = signed_index(segments.size() / 2 - 1, false);
+                    assert(v0 < segment[1]);
+                    Index diag_index = add_diagnonal(v0, segment[1]);
+                    si_next = signed_index(diag_index, false);
                 }
                 assert(si_prev != invalid_signed_index);
                 assert(si_next != invalid_signed_index);
