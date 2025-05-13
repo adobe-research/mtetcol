@@ -68,13 +68,12 @@ std::vector<Index> triangulate(
             assert(cycle.size() > 3);
             size_t num_segments_in_cycle = end - start;
 
-            // Pick the segment with minimum unsigned index as the cycle start segment.
+            // Pick the segment with minimum starting vertex index as the cycle start segment.
             // This ensures the same cycle from different polyhedra is triangulated consistently.
             size_t cycle_start_index = 0;
             for (size_t j = 0; j < num_segments_in_cycle; j++) {
                 auto si = cycle[j];
-                Index si_index = index(si);
-                if (si_index < index(cycle[cycle_start_index])) {
+                if (get_segment(si)[0] < get_segment(cycles[cycle_start_index])[0]) {
                     cycle_start_index = j;
                 }
             }

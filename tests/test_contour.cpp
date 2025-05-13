@@ -148,7 +148,7 @@ TEST_CASE("contour", "[mtetcol]")
 
         SECTION("Isocontour: two corners")
         {
-            std::vector<mtetcol::Scalar> function_values = { -1, 1, -1, 1, 1, 1, 1, 1 };
+            std::vector<mtetcol::Scalar> function_values = { -1, 1, 1, 1, 1, 1, -1, 1 };
             auto isocontour = contour.isocontour(function_values);
             REQUIRE(isocontour.get_num_cycles() == 2);
         }
