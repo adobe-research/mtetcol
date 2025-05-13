@@ -66,18 +66,31 @@ std::vector<Index> triangulate(
         } else {
             // Triangulate the cycle
             assert(cycle.size() > 3);
-            size_t num_segments = end - start;
-            auto first_segment = get_segment(cycle[0]);
-            Index v0 = first_segment[0];
+            size_t num_segments_in_cycle = end - start;
+
+            // Pick the segment with minimum unsigned index as the cycle start segment.
+            // This ensures the same cycle from different polyhedra is triangulated consistently.
+            size_t cycle_start_index = 0;
+            for (size_t j = 0; j < num_segments_in_cycle; j++) {
+                auto si = cycle[j];
+                Index si_index = index(si);
+                if (si_index < index(cycle[cycle_start_index])) {
+                    cycle_start_index = j;
+                }
+            }
+
+            // Using the first vertex of cycle start segment as the vertex to generate triangle fan
+            Index v0 = get_segment(cycle[cycle_start_index])[0];
 
             SignedIndex si_curr = invalid_signed_index;
             SignedIndex si_prev = invalid_signed_index;
             SignedIndex si_next = invalid_signed_index;
 
-            for (size_t j = 1; j + 1 < num_segments; j++) {
-                auto si = cycle[j];
+            for (size_t j = 1; j + 1 < num_segments_in_cycle; j++) {
+                size_t idx = (cycle_start_index + j) % num_segments_in_cycle;
+                auto si = cycle[idx];
                 auto target_segment = get_segment(si);
-                auto segment = get_segment(cycle[j]);
+                auto segment = get_segment(si);
 
                 si_curr = si;
 
@@ -85,10 +98,11 @@ std::vector<Index> triangulate(
                     segments.push_back(v0);
                     segments.push_back(segment[1]);
 
-                    si_prev = cycle[0];
+                    si_prev = cycle[cycle_start_index];
                     si_next = signed_index(segments.size() / 2 - 1, false);
-                } else if (j + 2 == num_segments) {
-                    si_next = cycle.back();
+                } else if (j + 2 == num_segments_in_cycle) {
+                    si_next = cycle
+                        [(cycle_start_index + num_segments_in_cycle - 1) % num_segments_in_cycle];
                 } else {
                     segments.push_back(v0);
                     segments.push_back(segment[1]);
@@ -352,7 +366,7 @@ Contour<4> Contour<4>::isocontour(std::span<Scalar> function_values) const
         size_t num_existing_cycles = result.m_cycle_start_indices.size();
         disjoint_cycles.extract_cycles(result.m_cycles, result.m_cycle_start_indices);
 
-        for (size_t j=num_existing_cycles; j < result.m_cycle_start_indices.size(); j++) {
+        for (size_t j = num_existing_cycles; j < result.m_cycle_start_indices.size(); j++) {
             result.m_cycle_is_regular.push_back(m_polyhedron_is_regular[i]);
         }
     }
