@@ -136,8 +136,8 @@ void DisjointComponents::extract_components(
         // Filter out polyhedra with less than 4 cycles.
         size_t curr_size = polyhedra.size();
         size_t polyhedron_size = curr_size - prev_size;
-        if (polyhedron_size < 3) {
-            // Drop polyhedra with less than 3 cycles
+        if (polyhedron_size < 2) {
+            // Drop polyhedra with less than 2 cycles
             logger().trace(
                 "Dropping polyhedron with {} cycles", polyhedron_size);
             polyhedra.erase(polyhedra.end() - polyhedron_size, polyhedra.end());
