@@ -52,7 +52,6 @@ std::vector<Index> triangulate(
         return {v0, v1};
     };
 
-    logger().info("num cycles: {}", num_cycles);
     for (size_t i = 0; i < num_cycles; i++) {
         auto start = cycle_indices[i];
         auto end = cycle_indices[i + 1];
@@ -111,8 +110,6 @@ std::vector<Index> triangulate(
 
     std::swap(cycles, triangle_cycles);
     std::swap(cycle_indices, triangle_cycle_indices);
-
-    logger().info("cycle_to_triangle_map size: {}", cycle_to_triangle_map.size());
 
     return cycle_to_triangle_map;
 }

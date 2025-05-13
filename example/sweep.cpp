@@ -230,8 +230,8 @@ int main(int argc, char** argv)
     columns.set_simplices(tets);
 
     // auto isocontour = sphere_translation(columns);
-    auto isocontour = sphere_rotation(columns);
-    // auto isocontour = torus_flip(columns);
+    // auto isocontour = sphere_rotation(columns);
+    auto isocontour = torus_flip(columns);
 
     isocontour.triangulate_cycles();
     mtetcol::save_contour("contour.msh", isocontour);

@@ -129,8 +129,20 @@ void DisjointComponents::extract_components(
         if (involved.contains(cycle_id)) {
             continue;
         }
+        size_t prev_size = polyhedra.size();
         grow_component(cid);
         polyhedron_indices.push_back(static_cast<Index>(polyhedra.size()));
+
+        // Filter out polyhedra with less than 4 cycles.
+        size_t curr_size = polyhedra.size();
+        size_t polyhedron_size = curr_size - prev_size;
+        if (polyhedron_size < 3) {
+            // Drop polyhedra with less than 3 cycles
+            logger().trace(
+                "Dropping polyhedron with {} cycles", polyhedron_size);
+            polyhedra.erase(polyhedra.end() - polyhedron_size, polyhedra.end());
+            polyhedron_indices.pop_back();
+        }
     }
 }
 
