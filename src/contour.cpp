@@ -421,7 +421,6 @@ Contour<4> Contour<4>::isocontour(std::span<Scalar> function_values) const
     size_t num_polyhedra = get_num_polyhedra();
     DisjointCycles disjoint_cycles(result.get_num_vertices(), result.m_segments);
     for (size_t i = 0; i < num_polyhedra; i++) {
-        check_polyhedron(i);
         disjoint_cycles.clear();
         auto polyhedron = get_polyhedron(i);
         for (auto cid : polyhedron) {
