@@ -120,8 +120,19 @@ TEST_CASE("benchmark", "[mtetcol][.benchmark]")
         function_values[i] = sweep_function.value({pos[0], pos[1], pos[2]}, pos[3]);
     }
 
+    std::vector<mtetcol::Scalar> function_gradients;
+    function_gradients.reserve(num_contour_vertices * 4);
+    for (size_t i = 0; i < num_contour_vertices; ++i) {
+        auto pos = contour.get_vertex(i);
+        std::array<mtetcol::Scalar, 4> gradient =
+            sweep_function.gradient({pos[0], pos[1], pos[2]}, pos[3]);
+        for (int j = 0; j < 4; ++j) {
+            function_gradients.push_back(gradient[j]);
+        }
+    }
+
     BENCHMARK("Stage 2: `f=0` contour")
     {
-        return contour.isocontour(function_values);
+        return contour.isocontour(function_values, function_gradients);
     };
 }

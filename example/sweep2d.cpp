@@ -110,7 +110,17 @@ mtetcol::Contour<3> circle_rotation(mtetcol::SimplicialColumn<3>& columns)
         function_values[i] = sweep_function.value({pos[0], pos[1]}, pos[2]);
     }
 
-    return contour.isocontour(function_values);
+    std::vector<Scalar> function_gradients;
+    function_gradients.reserve(num_contour_vertices * 3);
+    for (size_t i = 0; i < num_contour_vertices; ++i) {
+        auto pos = contour.get_vertex(i);
+        std::array<Scalar, 3> gradient = sweep_function.gradient({pos[0], pos[1]}, pos[2]);
+        for (int j = 0; j < 3; ++j) {
+            function_gradients.push_back(gradient[j]);
+        }
+    }
+
+    return contour.isocontour(function_values, function_gradients);
 }
 
 mtetcol::Contour<3> lemniscate_of_bernoulli(mtetcol::SimplicialColumn<3>& columns)
@@ -147,7 +157,17 @@ mtetcol::Contour<3> lemniscate_of_bernoulli(mtetcol::SimplicialColumn<3>& column
         function_values[i] = sweep_function.value({pos[0], pos[1]}, pos[2]);
     }
 
-    return contour.isocontour(function_values);
+    std::vector<Scalar> function_gradients;
+    function_gradients.reserve(num_contour_vertices * 3);
+    for (size_t i = 0; i < num_contour_vertices; ++i) {
+        auto pos = contour.get_vertex(i);
+        std::array<Scalar, 3> gradient = sweep_function.gradient({pos[0], pos[1]}, pos[2]);
+        for (int j = 0; j < 3; ++j) {
+            function_gradients.push_back(gradient[j]);
+        }
+    }
+
+    return contour.isocontour(function_values, function_gradients);
 }
 
 int main(int argc, char** argv)

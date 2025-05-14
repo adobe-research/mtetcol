@@ -33,6 +33,13 @@ TEST_CASE("transform", "[mtetcol]")
         auto v3_fd = rotation.finite_difference({1, 1}, 0.75);
         REQUIRE_THAT(v3[0], Catch::Matchers::WithinAbs(v3_fd[0], 1e-6));
         REQUIRE_THAT(v3[1], Catch::Matchers::WithinAbs(v3_fd[1], 1e-6));
+
+        auto J = rotation.position_Jacobian({1, 1}, 0.75);
+        auto J_fd = rotation.finite_difference_Jacobian({1, 1}, 0.75);
+        for (int i = 0; i < 2; ++i)
+            for (int j = 0; j < 2; ++j) {
+                REQUIRE_THAT(J[i][j], Catch::Matchers::WithinAbs(J_fd[i][j], 1e-6));
+            }
     }
 
     SECTION("Compose") {
@@ -80,6 +87,26 @@ TEST_CASE("transform", "[mtetcol]")
             REQUIRE_THAT(p0[0], Catch::Matchers::WithinAbs(2, 1e-6));
             REQUIRE_THAT(p0[1], Catch::Matchers::WithinAbs(0, 1e-6));
             REQUIRE_THAT(p0[2], Catch::Matchers::WithinAbs(0, 1e-6));
+        }
+
+        SECTION("Jacobian: Origin at t = 0.5")
+        {
+            auto J = compose.position_Jacobian({0, 0, 0}, 0.5);
+            auto J_fd = compose.finite_difference_Jacobian({0, 0, 0}, 0.5);
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 3; ++j) {
+                    REQUIRE_THAT(J[i][j], Catch::Matchers::WithinAbs(J_fd[i][j], 1e-6));
+                }
+        }
+
+        SECTION("Jacobian: [1, 0, 0] at t = 0.5")
+        {
+            auto J = compose.position_Jacobian({1, 0, 0}, 0.5);
+            auto J_fd = compose.finite_difference_Jacobian({1, 0, 0}, 0.5);
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 3; ++j) {
+                    REQUIRE_THAT(J[i][j], Catch::Matchers::WithinAbs(J_fd[i][j], 1e-6));
+                }
         }
     }
 }

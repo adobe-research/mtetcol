@@ -293,10 +293,13 @@ public:
      * @brief Compute the isocontour of this contour.
      *
      * @param function_values A span of function values at the vertices of the contour.
+     * @param function_gradients (optional) A span of function gradients at the vertices of the contour.
      *
      * @return A Contour object representing the isocontour.
      */
-    Contour<dim> isocontour(std::span<Scalar> function_values) const;
+    Contour<dim> isocontour(
+        std::span<Scalar> function_values,
+        std::span<Scalar> function_gradients = {}) const;
 
 private:
     void check_all_segments() const {

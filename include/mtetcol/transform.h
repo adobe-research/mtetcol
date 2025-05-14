@@ -37,6 +37,9 @@ public:
      * @return std::array<Scalar, dim> The velocity vector
      */
     virtual std::array<Scalar, dim> velocity(std::array<Scalar, dim> pos, Scalar t) const = 0;
+    virtual std::array<std::array<Scalar, dim>, dim> position_Jacobian(
+        std::array<Scalar, dim> pos,
+        Scalar t) const = 0;
 };
 
 /**
@@ -72,6 +75,18 @@ public:
     std::array<Scalar, dim> velocity(std::array<Scalar, dim> pos, Scalar t) const override
     {
         return m_translation;
+    }
+
+    std::array<std::array<Scalar, dim>, dim> position_Jacobian(
+        std::array<Scalar, dim> pos,
+        Scalar t) const override
+    {
+        std::array<std::array<Scalar, dim>, dim> jacobian{};
+        // For translation, the Jacobian is the identity matrix
+        for (int i = 0; i < dim; ++i) {
+            jacobian[i][i] = 1;
+        }
+        return jacobian;
     }
 
 private:
@@ -245,6 +260,80 @@ public:
         return velocity;
     }
 
+    std::array<std::array<Scalar, dim>, dim> position_Jacobian(
+        std::array<Scalar, dim> /*pos*/,
+        Scalar t) const override
+    {
+        // rotation angle (rad)
+        const Scalar theta = t * m_angle * M_PI / 180.0;
+        std::array<std::array<Scalar, dim>, dim> J{};
+
+        // since theta and center do not depend on pos, the Jacobian is the rotation matrix
+        if constexpr (dim == 2) {
+            const Scalar c = std::cos(theta);
+            const Scalar s = std::sin(theta);
+
+            J[0][0] = c;
+            J[0][1] = -s;
+            J[1][0] = s;
+            J[1][1] = c;
+        } else {
+            static_assert(dim == 3, "Rotation is only implemented for 2D and 3d");
+            // normalise axis
+            const Scalar len =
+                std::sqrt(m_axis[0] * m_axis[0] + m_axis[1] * m_axis[1] + m_axis[2] * m_axis[2]);
+            const Scalar ux = m_axis[0] / len;
+            const Scalar uy = m_axis[1] / len;
+            const Scalar uz = m_axis[2] / len;
+
+            const Scalar c = std::cos(theta);
+            const Scalar s = std::sin(theta);
+            const Scalar oc = 1 - c; // 1 - cosθ
+
+            J[0][0] = c + ux * ux * oc;
+            J[0][1] = ux * uy * oc - uz * s;
+            J[0][2] = ux * uz * oc + uy * s;
+
+            J[1][0] = uy * ux * oc + uz * s;
+            J[1][1] = c + uy * uy * oc;
+            J[1][2] = uy * uz * oc - ux * s;
+
+            J[2][0] = uz * ux * oc - uy * s;
+            J[2][1] = uz * uy * oc + ux * s;
+            J[2][2] = c + uz * uz * oc;
+        }
+        return J;
+    }
+
+    std::array<std::array<Scalar, dim>, dim> finite_difference_Jacobian(
+        std::array<Scalar, dim> pos,
+        Scalar t) const
+    {
+        constexpr Scalar eps = 1e-6;
+        std::array<std::array<Scalar, dim>, dim> J{};
+
+        // For each dimension i, compute partial derivative with respect to pos[i]
+        for (int i = 0; i < dim; ++i) {
+            // Forward point
+            auto pos_plus = pos;
+            pos_plus[i] += eps;
+            auto val_plus = transform(pos_plus, t);
+
+            // Backward point
+            auto pos_minus = pos;
+            pos_minus[i] -= eps;
+            auto val_minus = transform(pos_minus, t);
+
+            // Central difference
+            for (int j = 0; j < dim; ++j) {
+                J[j][i] = (val_plus[j] - val_minus[j]) / (2 * eps);
+            }
+        }
+        return J;
+    }
+
+    
+
 private:
     std::array<Scalar, dim> m_center; ///< Center point of rotation
     std::array<Scalar, dim> m_axis; ///< Rotation axis (3D only)
@@ -292,6 +381,53 @@ public:
             velocity[i] = (value_next[i] - value_prev[i]) / (2 * delta);
         }
         return velocity;
+    }
+
+    std::array<std::array<Scalar, dim>, dim> position_Jacobian(
+        std::array<Scalar, dim> pos,
+        Scalar t) const override
+    {
+        // 1) evaluate first transform and both Jacobians
+        const auto intermediate = m_transform1.transform(pos, t);
+        const auto J1 = m_transform1.position_Jacobian(pos, t);
+        const auto J2 = m_transform2.position_Jacobian(intermediate, t);
+
+        // 2) matrix product  J = J2 * J1
+        std::array<std::array<Scalar, dim>, dim> J{};
+        for (int i = 0; i < dim; ++i)
+            for (int j = 0; j < dim; ++j) {
+                Scalar sum = 0;
+                for (int k = 0; k < dim; ++k) sum += J2[i][k] * J1[k][j];
+                J[i][j] = sum;
+            }
+        return J;
+    }
+
+    std::array<std::array<Scalar, dim>, dim> finite_difference_Jacobian(
+        std::array<Scalar, dim> pos,
+        Scalar t) const
+    {
+        constexpr Scalar eps = 1e-6;
+        std::array<std::array<Scalar, dim>, dim> J{};
+
+        // For each dimension i, compute partial derivative with respect to pos[i]
+        for (int i = 0; i < dim; ++i) {
+            // Forward point
+            auto pos_plus = pos;
+            pos_plus[i] += eps;
+            auto val_plus = transform(pos_plus, t);
+
+            // Backward point
+            auto pos_minus = pos;
+            pos_minus[i] -= eps;
+            auto val_minus = transform(pos_minus, t);
+
+            // Central difference
+            for (int j = 0; j < dim; ++j) {
+                J[j][i] = (val_plus[j] - val_minus[j]) / (2 * eps);
+            }
+        }
+        return J;
     }
 
 private:

@@ -239,6 +239,145 @@ std::vector<Index> compute_zero_crossing_vertices(
     return zero_crossing_vertices;
 }
 
+// compute a cubic root in [0,1] given values and gradients at two endpoints
+Scalar get_cubic_root(Scalar val1, Scalar val2, Scalar g1, Scalar g2)
+{
+    if (val1 == 0) {
+        return 0;
+    }
+    if (val2 == 0) {
+        return 1;
+    }
+    assert(val1 * val2 < 0);
+
+    // make sure val1 < 0 and val2 > 0
+    if (val1 > 0) {
+        val1 = -val1;
+        val2 = -val2;
+        g1 = -g1;
+        g2 = -g2;
+    }
+
+    // compute the cubic function f(x) = a*x^3 + b*x^2 + c*x + d
+    const Scalar a = g1 + g2 + 2 * (val1 - val2);
+    const Scalar b = 3 * (val2 - val1) - 2 * g1 - g2;
+    const Scalar c = g1;
+    const Scalar d = val1;
+
+    // initial guess: the linear root
+    Scalar x = val1 / (val1 - val2);
+
+    // root finding: combine Halley's method and bisect method
+    // mostly a bisect method, but first find the next guess using Halley's method,
+    // if the guess doesn't lie in the sign-changing interval, use the midpoint of that interval
+    // terminate when the change in x is small
+    Scalar xlo = 0;
+    Scalar xhi = 1;
+    constexpr Scalar x_tol = 1e-4;
+    constexpr int max_iterations = 100; // Maximum number of iterations
+    int iteration = 0; // Iteration counter
+    while (true) {
+        if (iteration++ >= max_iterations) {
+            logger().warn("Maximum iterations reached in get_cubic_root");
+            break;
+        }
+        Scalar f = d + x * (c + x * (b + x * a));
+        if (f == 0) {
+            break;
+        }
+        if (f < 0) {
+            xlo = x;
+        } else {
+            xhi = x;
+        }
+        // f'(x) = 3*a*x^2 + 2*b*x + c
+        // f''(x) = 6*a*x + 2*b
+        const Scalar df = c + x * (2 * b + x * 3 * a);
+        const Scalar ddf = 2 * b + x * 6 * a;
+        const Scalar denominator = 2 * df * df - f * ddf;
+        Scalar x_new;
+        if (std::abs(denominator) < 1e-8) { // Safeguard against division by zero
+            x_new = 0.5 * (xlo + xhi); // Use the midpoint of the interval
+        } else {
+            const Scalar dx = 2 * f * df / denominator;
+            x_new = x - dx;
+        }
+        if (x_new <= xlo || x_new >= xhi) {
+            x_new = 0.5 * (xlo + xhi);
+        }
+        if (std::abs(x_new - x) < x_tol) {
+            x = x_new;
+            break;
+        }
+        x = x_new;
+    }
+
+    return x;
+}
+
+template <int dim>
+std::vector<Index> compute_zero_crossing_vertices(
+    const Contour<dim>& contour,
+    std::span<const Scalar> function_values,
+    std::span<const Scalar> function_gradients,
+    Contour<dim>& result)
+{
+    static_assert(dim == 3 || dim == 4, "dim must be 3 or 4");
+    size_t num_segments = contour.get_num_segments();
+    std::vector<Index> zero_crossing_vertices(num_segments, invalid_index);
+
+    auto interpolate_segment = [&](Index v0, Index v1) {
+        Scalar val0 = function_values[v0];
+        Scalar val1 = function_values[v1];
+        auto pos0 = contour.get_vertex(v0);
+        auto pos1 = contour.get_vertex(v1);
+        auto grad0 = function_gradients.subspan(v0 * dim, dim);
+        auto grad1 = function_gradients.subspan(v1 * dim, dim);
+        // directional derivatives
+        Scalar g0, g1;
+        // since the interval is scaled to (0,1), we don't normalize by dividing by the length of
+        // p0p1
+        if constexpr (dim == 3) {
+            g0 = grad0[0] * (pos1[0] - pos0[0]) + grad0[1] * (pos1[1] - pos0[1]) +
+                 grad0[2] * (pos1[2] - pos0[2]);
+            g1 = grad1[0] * (pos1[0] - pos0[0]) + grad1[1] * (pos1[1] - pos0[1]) +
+                 grad1[2] * (pos1[2] - pos0[2]);
+        } else if constexpr (dim == 4) {
+            g0 = grad0[0] * (pos1[0] - pos0[0]) + grad0[1] * (pos1[1] - pos0[1]) +
+                 grad0[2] * (pos1[2] - pos0[2]) + grad0[3] * (pos1[3] - pos0[3]);
+            g1 = grad1[0] * (pos1[0] - pos0[0]) + grad1[1] * (pos1[1] - pos0[1]) +
+                 grad1[2] * (pos1[2] - pos0[2]) + grad1[3] * (pos1[3] - pos0[3]);
+        }
+
+        Scalar t = get_cubic_root(val0, val1, g0, g1);
+        if constexpr (dim == 3) {
+            result.add_vertex(
+                {pos0[0] + t * (pos1[0] - pos0[0]),
+                 pos0[1] + t * (pos1[1] - pos0[1]),
+                 pos0[2] + t * (pos1[2] - pos0[2])});
+        } else if constexpr (dim == 4) {
+            result.add_vertex(
+                {pos0[0] + t * (pos1[0] - pos0[0]),
+                 pos0[1] + t * (pos1[1] - pos0[1]),
+                 pos0[2] + t * (pos1[2] - pos0[2]),
+                 pos0[3] + t * (pos1[3] - pos0[3])});
+        }
+        return static_cast<Index>(result.get_num_vertices() - 1);
+    };
+
+    for (size_t i = 0; i < num_segments; i++) {
+        auto seg = contour.get_segment(i);
+        Index v0 = seg[0];
+        Index v1 = seg[1];
+        if (function_values[v0] >= 0 && function_values[v1] < 0 ||
+            function_values[v0] < 0 && function_values[v1] >= 0) {
+            zero_crossing_vertices[i] = interpolate_segment(v0, v1);
+        }
+    }
+
+    return zero_crossing_vertices;
+}
+
 template <int dim>
 std::vector<Index> compute_zero_crossing_segments(
     const Contour<dim>& contour,
@@ -387,14 +526,21 @@ void Contour<4>::triangulate_cycles()
 }
 
 template <>
-Contour<3> Contour<3>::isocontour(std::span<Scalar> function_values) const
+Contour<3> Contour<3>::isocontour(
+    std::span<Scalar> function_values,
+    std::span<Scalar> function_gradients) const
 {
     assert(get_num_vertices() == function_values.size());
+    bool has_gradients = function_gradients.size() == get_num_vertices() * 3;
     Contour<3> result;
 
-    std::vector<Index> zero_crossing_vertices =
-        compute_zero_crossing_vertices(*this, function_values, result);
-
+    std::vector<Index> zero_crossing_vertices;
+    if (has_gradients) {
+        zero_crossing_vertices =
+            compute_zero_crossing_vertices(*this, function_values, function_gradients, result);
+    } else {
+        zero_crossing_vertices = compute_zero_crossing_vertices(*this, function_values, result);
+    }
     compute_zero_crossing_segments(*this, function_values, zero_crossing_vertices, result);
 
 #ifndef NDEBUG
@@ -407,13 +553,21 @@ Contour<3> Contour<3>::isocontour(std::span<Scalar> function_values) const
 }
 
 template <>
-Contour<4> Contour<4>::isocontour(std::span<Scalar> function_values) const
+Contour<4> Contour<4>::isocontour(
+    std::span<Scalar> function_values,
+    std::span<Scalar> function_gradients) const
 {
     assert(get_num_vertices() == function_values.size());
+    bool has_gradients = function_gradients.size() == get_num_vertices() * 4;
     Contour<4> result;
 
-    std::vector<Index> zero_crossing_vertices =
-        compute_zero_crossing_vertices(*this, function_values, result);
+    std::vector<Index> zero_crossing_vertices;
+    if (has_gradients) {
+        zero_crossing_vertices =
+            compute_zero_crossing_vertices(*this, function_values, function_gradients, result);
+    } else {
+        zero_crossing_vertices = compute_zero_crossing_vertices(*this, function_values, result);
+    }
 
     std::vector<Index> zero_crossing_segment_indices =
         compute_zero_crossing_segments(*this, function_values, zero_crossing_vertices, result);

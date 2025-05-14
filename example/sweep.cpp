@@ -115,7 +115,17 @@ mtetcol::Contour<4> sphere_translation(mtetcol::SimplicialColumn<4>& columns)
         function_values[i] = sweep_function.value({pos[0], pos[1], pos[2]}, pos[3]);
     }
 
-    return contour.isocontour(function_values);
+    std::vector<Scalar> function_gradients;
+    function_gradients.reserve(num_contour_vertices * 4);
+    for (size_t i = 0; i < num_contour_vertices; ++i) {
+        auto pos = contour.get_vertex(i);
+        std::array<Scalar, 4> gradient = sweep_function.gradient({pos[0], pos[1], pos[2]}, pos[3]);
+        for (int j = 0; j < 4; ++j) {
+            function_gradients.push_back(gradient[j]);
+        }
+    }
+
+    return contour.isocontour(function_values, function_gradients);
 }
 
 mtetcol::Contour<4> sphere_rotation(mtetcol::SimplicialColumn<4>& columns)
@@ -145,7 +155,17 @@ mtetcol::Contour<4> sphere_rotation(mtetcol::SimplicialColumn<4>& columns)
         function_values[i] = sweep_function.value({pos[0], pos[1], pos[2]}, pos[3]);
     }
 
-    return contour.isocontour(function_values);
+    std::vector<Scalar> function_gradients;
+    function_gradients.reserve(num_contour_vertices * 4);
+    for (size_t i = 0; i < num_contour_vertices; ++i) {
+        auto pos = contour.get_vertex(i);
+        std::array<Scalar, 4> gradient = sweep_function.gradient({pos[0], pos[1], pos[2]}, pos[3]);
+        for (int j = 0; j < 4; ++j) {
+            function_gradients.push_back(gradient[j]);
+        }
+    }
+
+    return contour.isocontour(function_values, function_gradients);
 }
 
 mtetcol::Contour<4> torus_rotation(mtetcol::SimplicialColumn<4>& columns)
@@ -187,9 +207,19 @@ mtetcol::Contour<4> torus_rotation(mtetcol::SimplicialColumn<4>& columns)
         function_values[i] = sweep_function.value({pos[0], pos[1], pos[2]}, pos[3]);
     }
 
+    std::vector<Scalar> function_gradients;
+    function_gradients.reserve(num_contour_vertices * 4);
+    for (size_t i = 0; i < num_contour_vertices; ++i) {
+        auto pos = contour.get_vertex(i);
+        std::array<Scalar, 4> gradient = sweep_function.gradient({pos[0], pos[1], pos[2]}, pos[3]);
+        for (int j = 0; j < 4; ++j) {
+            function_gradients.push_back(gradient[j]);
+        }
+    }
+
     auto t5 = std::chrono::high_resolution_clock::now();
 
-    auto result = contour.isocontour(function_values);
+    auto result = contour.isocontour(function_values, function_gradients);
     auto t6 = std::chrono::high_resolution_clock::now();
 
     mtetcol::logger().info(
