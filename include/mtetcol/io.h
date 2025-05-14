@@ -30,4 +30,14 @@ void save_contour(
     const Contour<4>& contour,
     std::span<Scalar> function_values = {});
 
+
+/**
+ * @brief Saves a polyhedron from a contour to a file (mostly for debugging purposes).
+ *
+ * @param filename The path to the output file where the polyhedron will be saved
+ * @param contour The 4D contour containing the polyhedron
+ * @param polyhedron_id The ID of the polyhedron to be saved
+ */
+void save_polyhedron(std::string_view filename, const Contour<4>& contour, Index polyhedron_id);
+
 } // namespace mtetcol
