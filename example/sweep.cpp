@@ -6,6 +6,8 @@
 #include <mtetcol/sweep_function.h>
 #include <mtetcol/transform.h>
 
+#include "flipping_donut.h"
+
 #include <ankerl/unordered_dense.h>
 #include <mtet/grid.h>
 #include <mtet/io.h>
@@ -46,7 +48,7 @@ std::tuple<std::vector<Scalar>, std::vector<Index>> generate_simpicial_column(
 
 auto sample_time_derivative(
     mtetcol::SimplicialColumn<4>& columns,
-    const mtetcol::SweepFunction<3>& sweep_function,
+    const mtetcol::SpaceTimeFunction<3>& sweep_function,
     size_t num_time_samples,
     bool cyclic = false) -> std::
     tuple<std::vector<mtetcol::Scalar>, std::vector<mtetcol::Scalar>, std::vector<mtetcol::Index>>
@@ -146,7 +148,7 @@ mtetcol::Contour<4> sphere_rotation(mtetcol::SimplicialColumn<4>& columns)
     return contour.isocontour(function_values);
 }
 
-mtetcol::Contour<4> torus_flip(mtetcol::SimplicialColumn<4>& columns)
+mtetcol::Contour<4> torus_rotation(mtetcol::SimplicialColumn<4>& columns)
 {
     using Scalar = mtetcol::Scalar;
     using Index = mtetcol::Index;
@@ -212,6 +214,75 @@ mtetcol::Contour<4> torus_flip(mtetcol::SimplicialColumn<4>& columns)
     return result;
 }
 
+mtetcol::Contour<4> torus_flip(mtetcol::SimplicialColumn<4>& columns)
+{
+    using Scalar = mtetcol::Scalar;
+    using Index = mtetcol::Index;
+
+    constexpr size_t num_time_samples_per_vertex = 64;
+
+    mtetcol::ExplicitForm<3> sweep_function(
+        [](std::array<Scalar, 3> pos, Scalar t) {
+            return mtetcol::raw_flipping_donut({pos[0], pos[1], pos[2], t}).first;
+        },
+        [](std::array<Scalar, 3> pos, Scalar t) {
+            return mtetcol::raw_flipping_donut({pos[0], pos[1], pos[2], t}).second[3];
+        });
+
+    auto t0 = std::chrono::high_resolution_clock::now();
+    auto [time_samples, function_values, vertex_start_indices] =
+        sample_time_derivative(columns, sweep_function, num_time_samples_per_vertex);
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    columns.set_time_samples(time_samples, function_values, vertex_start_indices);
+
+    auto t2 = std::chrono::high_resolution_clock::now();
+
+    auto contour = columns.extract_contour(0.0, false);
+
+    auto t3 = std::chrono::high_resolution_clock::now();
+
+    contour.triangulate_cycles();
+    mtetcol::save_contour("contour_grid.msh", contour);
+
+    auto t4 = std::chrono::high_resolution_clock::now();
+
+    size_t num_contour_vertices = contour.get_num_vertices();
+    function_values.clear();
+    function_values.resize(num_contour_vertices);
+    for (size_t i = 0; i < num_contour_vertices; ++i) {
+        auto pos = contour.get_vertex(i);
+        function_values[i] = sweep_function.value({pos[0], pos[1], pos[2]}, pos[3]);
+    }
+
+    auto t5 = std::chrono::high_resolution_clock::now();
+
+    auto result = contour.isocontour(function_values);
+    auto t6 = std::chrono::high_resolution_clock::now();
+
+    mtetcol::logger().info(
+        "sample_time_derivative: {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+    mtetcol::logger().info(
+        "set_time_samples: {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
+    mtetcol::logger().info(
+        "extract_contour: {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count());
+    mtetcol::logger().info(
+        "triangulate_cycles: {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count());
+    mtetcol::logger().info(
+        "initialize function value: {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t5 - t4).count());
+    mtetcol::logger().info(
+        "isocontour: {} ms",
+        std::chrono::duration_cast<std::chrono::milliseconds>(t6 - t5).count());
+
+    return result;
+}
+
 int main(int argc, char** argv)
 {
     mtetcol::logger().set_level(spdlog::level::debug);
@@ -231,6 +302,7 @@ int main(int argc, char** argv)
 
     // auto isocontour = sphere_translation(columns);
     // auto isocontour = sphere_rotation(columns);
+    // auto isocontour = torus_rotation(columns);
     auto isocontour = torus_flip(columns);
 
     isocontour.triangulate_cycles();

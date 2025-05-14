@@ -280,4 +280,41 @@ void save_contour(
     }
 }
 
+void save_polyhedron(std::string_view filename, const Contour<4>& contour, Index polyhedron_id)
+{
+    logger().info("Saving polyhedron {} to {}", polyhedron_id, filename);
+
+    std::ofstream fout(filename.data());
+    if (!fout.is_open()) {
+        throw std::runtime_error("Failed to open file: " + std::string(filename));
+    }
+
+    size_t num_vertices = contour.get_num_vertices();
+    size_t num_polyhedra = contour.get_num_polyhedra();
+
+    if (polyhedron_id >= num_polyhedra) {
+        throw std::out_of_range("Polyhedron ID out of range");
+    }
+
+    for (size_t i = 0; i < num_vertices; i++) {
+        auto pos = contour.get_vertex(i);
+        fout << "v " << pos[0] << " " << pos[1] << " " << pos[2] << " " << std::endl;
+    }
+
+    auto polyhedron = contour.get_polyhedron(polyhedron_id);
+    for (auto cid : polyhedron) {
+        auto cycle = contour.get_cycle(index(cid));
+        fout << "f ";
+        for (auto si : cycle) {
+            Index seg_id = index(si);
+            bool seg_ori = orientation(si);
+
+            auto seg = contour.get_segment(seg_id);
+
+            fout << (seg_ori ? seg[0] : seg[1]) + 1 << " ";
+        }
+        fout << std::endl;
+    }
+}
+
 } // namespace mtetcol

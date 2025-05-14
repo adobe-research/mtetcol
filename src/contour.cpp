@@ -35,7 +35,7 @@ std::vector<Index> triangulate(
 {
     size_t num_cycles = cycle_indices.size() - 1;
 
-    OrientedEdgeMap diagonal_map;
+    EdgeMap diagonal_map;
 
     std::vector<SignedIndex> triangle_cycles;
     std::vector<Index> triangle_cycle_indices;
@@ -57,29 +57,85 @@ std::vector<Index> triangulate(
         return {v0, v1};
     };
 
-    auto add_diagnonal = [&](Index v0, Index v1) {
+    /**
+     * Add a new segment (v0, v1) to segments.
+     * If ensure_unique is true, it will check if the segment has been added before.
+     */
+    auto add_diagonal = [&](Index v0, Index v1, bool ensure_unique) -> SignedIndex {
         Index num_segments = segments.size() / 2;
-        auto [itr, inserted] = diagonal_map.try_emplace({v0, v1}, num_segments);
-        Index diag_index = itr->second;
-        if (inserted) {
-            assert(diag_index == num_segments);
+        Index diag_index = invalid_index;
+        if (ensure_unique) {
+            auto [itr, inserted] = diagonal_map.try_emplace({v0, v1}, num_segments);
+            diag_index = itr->second;
+            if (inserted) {
+                assert(diag_index == num_segments);
+                segments.push_back(v0);
+                segments.push_back(v1);
+            }
+            bool diag_ori = segments[diag_index * 2] == v0;
+            assert(!inserted || diag_ori);
+            return signed_index(diag_index, diag_ori);
+        } else {
+            diag_index = num_segments;
             segments.push_back(v0);
             segments.push_back(v1);
+            return signed_index(diag_index, true);
         }
-        return diag_index;
     };
 
     for (size_t i = 0; i < num_cycles; i++) {
         auto start = cycle_indices[i];
         auto end = cycle_indices[i + 1];
         auto cycle = std::span<const SignedIndex>(cycles.data() + start, end - start);
+        size_t num_segments_in_cycle = end - start;
 
-        if (cycle.size() < 3) {
+        if (num_segments_in_cycle < 3) {
             // Cycle of size smaller than 3 is dropped.
-        } else if (cycle.size() == 3) {
+        } else if (num_segments_in_cycle == 3) {
             // Check if the cycle is a triangle
             std::copy(cycle.begin(), cycle.end(), std::back_inserter(triangle_cycles));
             triangle_cycle_indices.push_back(triangle_cycles.size());
+        } else if (num_segments_in_cycle == 4) {
+            // Cycle is a quad, uniquely deterine a diagonal to insert
+            std::array<Index, 4> cycle_vertices;
+            for (size_t j = 0; j < 4; j++) {
+                auto si = cycle[j];
+                auto segment = get_segment(si);
+                cycle_vertices[j] = segment[0];
+            }
+
+            if (std::min(cycle_vertices[0], cycle_vertices[2]) <
+                std::min(cycle_vertices[1], cycle_vertices[3])) {
+                // Insert diagonal 0-2
+                SignedIndex diag_index = add_diagonal(cycle_vertices[0], cycle_vertices[2], true);
+
+                // Add triangle (0, 1, 2)
+                triangle_cycles.push_back(cycle[0]);
+                triangle_cycles.push_back(cycle[1]);
+                triangle_cycles.push_back(-diag_index);
+                triangle_cycle_indices.push_back(triangle_cycles.size());
+
+                // Add triangle (2, 3, 0)
+                triangle_cycles.push_back(cycle[2]);
+                triangle_cycles.push_back(cycle[3]);
+                triangle_cycles.push_back(diag_index);
+                triangle_cycle_indices.push_back(triangle_cycles.size());
+            } else {
+                // Insert diagonal 1-3
+                SignedIndex diag_index = add_diagonal(cycle_vertices[1], cycle_vertices[3], true);
+
+                // Add triangle (0, 1, 3)
+                triangle_cycles.push_back(cycle[0]);
+                triangle_cycles.push_back(diag_index);
+                triangle_cycles.push_back(cycle[3]);
+                triangle_cycle_indices.push_back(triangle_cycles.size());
+
+                // Add triangle (1, 2, 3)
+                triangle_cycles.push_back(cycle[1]);
+                triangle_cycles.push_back(cycle[2]);
+                triangle_cycles.push_back(-diag_index);
+                triangle_cycle_indices.push_back(triangle_cycles.size());
+            }
         } else {
             // Triangulate the cycle
             assert(cycle.size() > 3);
@@ -111,16 +167,16 @@ std::vector<Index> triangulate(
 
                 if (j == 1) {
                     assert(v0 < segment[1]);
-                    Index diag_index = add_diagnonal(v0, segment[1]);
+                    SignedIndex diag_index = add_diagonal(v0, segment[1], false);
                     si_prev = cycle[cycle_start_index];
-                    si_next = signed_index(diag_index, false);
+                    si_next = -diag_index;
                 } else if (j + 2 == num_segments_in_cycle) {
                     si_next = cycle
                         [(cycle_start_index + num_segments_in_cycle - 1) % num_segments_in_cycle];
                 } else {
                     assert(v0 < segment[1]);
-                    Index diag_index = add_diagnonal(v0, segment[1]);
-                    si_next = signed_index(diag_index, false);
+                    SignedIndex diag_index = add_diagonal(v0, segment[1], false);
+                    si_next = -diag_index;
                 }
                 assert(si_prev != invalid_signed_index);
                 assert(si_next != invalid_signed_index);
@@ -365,11 +421,13 @@ Contour<4> Contour<4>::isocontour(std::span<Scalar> function_values) const
     size_t num_polyhedra = get_num_polyhedra();
     DisjointCycles disjoint_cycles(result.get_num_vertices(), result.m_segments);
     for (size_t i = 0; i < num_polyhedra; i++) {
+        check_polyhedron(i);
         disjoint_cycles.clear();
         auto polyhedron = get_polyhedron(i);
         for (auto cid : polyhedron) {
             Index seg_start = zero_crossing_segment_indices[index(cid)];
             Index seg_end = zero_crossing_segment_indices[index(cid) + 1];
+            assert(seg_end - seg_start < 2);
             bool cycle_ori = orientation(cid);
 
             for (Index seg_id = seg_start; seg_id < seg_end; seg_id++) {

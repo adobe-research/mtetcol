@@ -137,9 +137,41 @@ void DisjointComponents::extract_components(
         size_t curr_size = polyhedra.size();
         size_t polyhedron_size = curr_size - prev_size;
         if (polyhedron_size < 3) {
-            logger().trace("Dropping polyhedron with {} cycles", polyhedron_size);
-            polyhedra.erase(polyhedra.end() - polyhedron_size, polyhedra.end());
-            polyhedron_indices.pop_back();
+            bool should_drop = true;
+            if (polyhedron_size == 2) {
+                SignedIndex cycle1 = polyhedra[prev_size];
+                SignedIndex cycle2 = polyhedra[prev_size + 1];
+                Index cycle1_id = index(cycle1);
+                Index cycle2_id = index(cycle2);
+
+                Index cycle1_begin = m_cycle_indices[cycle1_id];
+                Index cycle1_end = m_cycle_indices[cycle1_id + 1];
+                Index cycle2_begin = m_cycle_indices[cycle2_id];
+                Index cycle2_end = m_cycle_indices[cycle2_id + 1];
+
+                ankerl::unordered_dense::set<Index> involved_segments;
+                for (Index i = cycle1_begin; i < cycle1_end; i++) {
+                    SignedIndex si = m_cycles[i];
+                    Index seg_id = index(si);
+                    involved_segments.insert(seg_id);
+                }
+                for (Index i = cycle2_begin; i < cycle2_end; i++) {
+                    SignedIndex si = m_cycles[i];
+                    Index seg_id = index(si);
+                    involved_segments.insert(seg_id);
+                }
+
+                // Both cycles are quads with opposite orientations.
+                should_drop = (involved_segments.size() == 4);
+            } else {
+                logger().trace("Not dropping 2-cycle polyhedron with non-quad cycles");
+            }
+
+            if (should_drop) {
+                logger().trace("Dropping polyhedron with {} cycles", polyhedron_size);
+                polyhedra.erase(polyhedra.end() - polyhedron_size, polyhedra.end());
+                polyhedron_indices.pop_back();
+            }
         }
     }
 }
