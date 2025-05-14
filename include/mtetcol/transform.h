@@ -1,6 +1,9 @@
 #pragma once
 
 #include <mtetcol/common.h>
+#include <mtetcol/logger.h>
+
+#include <spdlog/fmt/ranges.h>
 
 #include <array>
 #include <span>
@@ -37,9 +40,71 @@ public:
      * @return std::array<Scalar, dim> The velocity vector
      */
     virtual std::array<Scalar, dim> velocity(std::array<Scalar, dim> pos, Scalar t) const = 0;
+
+    /**
+     * @brief Calculates the Jacobian matrix of the transformation with respect to position.
+     *
+     * This method computes the partial derivatives of the transformation with respect to
+     * each component of the input position. The Jacobian matrix represents how small changes
+     * in the input position affect the transformed position.
+     *
+     * @param pos The position at which to calculate the Jacobian
+     * @param t The time parameter for time-dependent transformations
+     * @return std::array<std::array<Scalar, dim>, dim> The Jacobian matrix
+     */
     virtual std::array<std::array<Scalar, dim>, dim> position_Jacobian(
         std::array<Scalar, dim> pos,
         Scalar t) const = 0;
+
+    /**
+     * @brief Calculates velocity using finite difference approximation.
+     *
+     * This is a helper method that computes velocity using central difference
+     * approximation. It's used for verification purposes.
+     *
+     * @param pos The position at which to calculate the velocity
+     * @param t The time parameter
+     * @return std::array<Scalar, dim> The approximated velocity vector
+     */
+    std::array<Scalar, dim> finite_difference_velocity(std::array<Scalar, dim> pos, Scalar t) const
+    {
+        // Using finite difference to calculate the velocity
+        constexpr Scalar delta = 1e-6;
+        auto value_prev = transform(pos, t - delta);
+        auto value_next = transform(pos, t + delta);
+        std::array<Scalar, dim> velocity;
+        for (int i = 0; i < dim; ++i) {
+            velocity[i] = (value_next[i] - value_prev[i]) / (2 * delta);
+        }
+        return velocity;
+    }
+
+    std::array<std::array<Scalar, dim>, dim> finite_difference_Jacobian(
+        std::array<Scalar, dim> pos,
+        Scalar t) const
+    {
+        constexpr Scalar eps = 1e-6;
+        std::array<std::array<Scalar, dim>, dim> J{};
+
+        // For each dimension i, compute partial derivative with respect to pos[i]
+        for (int i = 0; i < dim; ++i) {
+            // Forward point
+            auto pos_plus = pos;
+            pos_plus[i] += eps;
+            auto val_plus = transform(pos_plus, t);
+
+            // Backward point
+            auto pos_minus = pos;
+            pos_minus[i] -= eps;
+            auto val_minus = transform(pos_minus, t);
+
+            // Central difference
+            for (int j = 0; j < dim; ++j) {
+                J[j][i] = (val_plus[j] - val_minus[j]) / (2 * eps);
+            }
+        }
+        return J;
+    }
 };
 
 /**
@@ -236,30 +301,6 @@ public:
         }
     }
 
-    /**
-     * @brief Calculates velocity using finite difference approximation.
-     *
-     * This is a helper method that computes velocity using central difference
-     * approximation. It's used for verification purposes.
-     *
-     * @param pos The position at which to calculate the velocity
-     * @param t The time parameter
-     * @return std::array<Scalar, dim> The approximated velocity vector
-     */
-    std::array<Scalar, dim> finite_difference(std::array<Scalar, dim> pos, Scalar t) const
-    {
-        constexpr Scalar delta = 1e-6;
-        std::array<Scalar, dim> pos_plus_delta = transform(pos, t + delta);
-        std::array<Scalar, dim> pos_minus_delta = transform(pos, t - delta);
-        std::array<Scalar, dim> velocity;
-
-        for (int i = 0; i < dim; ++i) {
-            velocity[i] = (pos_plus_delta[i] - pos_minus_delta[i]) / (2 * delta);
-        }
-
-        return velocity;
-    }
-
     std::array<std::array<Scalar, dim>, dim> position_Jacobian(
         std::array<Scalar, dim> /*pos*/,
         Scalar t) const override
@@ -305,39 +346,88 @@ public:
         return J;
     }
 
-    std::array<std::array<Scalar, dim>, dim> finite_difference_Jacobian(
-        std::array<Scalar, dim> pos,
-        Scalar t) const
-    {
-        constexpr Scalar eps = 1e-6;
-        std::array<std::array<Scalar, dim>, dim> J{};
-
-        // For each dimension i, compute partial derivative with respect to pos[i]
-        for (int i = 0; i < dim; ++i) {
-            // Forward point
-            auto pos_plus = pos;
-            pos_plus[i] += eps;
-            auto val_plus = transform(pos_plus, t);
-
-            // Backward point
-            auto pos_minus = pos;
-            pos_minus[i] -= eps;
-            auto val_minus = transform(pos_minus, t);
-
-            // Central difference
-            for (int j = 0; j < dim; ++j) {
-                J[j][i] = (val_plus[j] - val_minus[j]) / (2 * eps);
-            }
-        }
-        return J;
-    }
-
-    
 
 private:
     std::array<Scalar, dim> m_center; ///< Center point of rotation
     std::array<Scalar, dim> m_axis; ///< Rotation axis (3D only)
     Scalar m_angle; ///< Total rotation angle in degrees
+};
+
+/**
+ * @brief A scaling transformation that scales points by different factors in each dimension.
+ *
+ * This class implements a scaling transformation where points are scaled by different
+ * factors in each dimension relative to a pivot point. The scaling can be uniform
+ * (same factor in all dimensions) or non-uniform (different factors per dimension).
+ *
+ * @tparam dim The dimensionality of the space (2D or 3D)
+ */
+template <int dim>
+class Scale : public Transform<dim>
+{
+public:
+    /**
+     * @brief Constructs a scaling transformation.
+     *
+     * @param factors The scaling factors for each dimension
+     * @param center The pivot point around which scaling occurs (default: origin)
+     */
+    Scale(
+        std::array<Scalar, dim> factors,
+        std::array<Scalar, dim> center = std::array<Scalar, dim>{0})
+        : m_factors(factors)
+        , m_center(center)
+    {}
+
+    std::array<Scalar, dim> transform(std::array<Scalar, dim> pos, Scalar t) const override
+    {
+        // Translate to origin
+        for (int i = 0; i < dim; ++i) {
+            pos[i] -= m_center[i];
+        }
+
+        // Apply scaling
+        for (int i = 0; i < dim; ++i) {
+            pos[i] *= (1.0 + (m_factors[i] - 1.0) * t);
+        }
+
+        // Translate back
+        for (int i = 0; i < dim; ++i) {
+            pos[i] += m_center[i];
+        }
+
+        return pos;
+    }
+
+    std::array<Scalar, dim> velocity(std::array<Scalar, dim> pos, Scalar t) const override
+    {
+        // Translate to origin
+        for (int i = 0; i < dim; ++i) {
+            pos[i] -= m_center[i];
+        }
+
+        std::array<Scalar, dim> velocity;
+        for (int i = 0; i < dim; ++i) {
+            velocity[i] = pos[i] * (m_factors[i] - 1.0);
+        }
+
+        return velocity;
+    }
+
+    std::array<std::array<Scalar, dim>, dim> position_Jacobian(
+        std::array<Scalar, dim> /*pos*/,
+        Scalar t) const override
+    {
+        std::array<std::array<Scalar, dim>, dim> jacobian{};
+        for (int i = 0; i < dim; ++i) {
+            jacobian[i][i] = 1.0 + (m_factors[i] - 1.0) * t;
+        }
+        return jacobian;
+    }
+
+private:
+    std::array<Scalar, dim> m_factors; ///< Scaling factors for each dimension
+    std::array<Scalar, dim> m_center; ///< Center point of scaling
 };
 
 /**
@@ -372,15 +462,29 @@ public:
 
     std::array<Scalar, dim> velocity(std::array<Scalar, dim> pos, Scalar t) const override
     {
-        // Using finite difference to calculate the velocity
-        constexpr Scalar delta = 1e-6;
-        auto value_prev = transform(pos, t - delta);
-        auto value_next = transform(pos, t + delta);
-        std::array<Scalar, dim> velocity;
-        for (int i = 0; i < dim; ++i) {
-            velocity[i] = (value_next[i] - value_prev[i]) / (2 * delta);
+        auto intermediate = m_transform1.transform(pos, t);
+        const auto v1 = m_transform1.velocity(pos, t);
+        const auto v2 = m_transform2.velocity(intermediate, t);
+        const auto J2 = m_transform2.position_Jacobian(intermediate, t);
+
+        // result = v2 + J2 * v1
+        std::array<Scalar, dim> result;
+
+        if constexpr (dim == 3) {
+            result = {
+                v2[0] + J2[0][0] * v1[0] + J2[0][1] * v1[1] + J2[0][2] * v1[2],
+                v2[1] + J2[1][0] * v1[0] + J2[1][1] * v1[1] + J2[1][2] * v1[2],
+                v2[2] + J2[2][0] * v1[0] + J2[2][1] * v1[1] + J2[2][2] * v1[2],
+            };
+        } else {
+            static_assert(dim == 2, "Composite transform is only implemented for 2D and 3D");
+            result = {
+                v2[0] + J2[0][0] * v1[0] + J2[0][1] * v1[1],
+                v2[1] + J2[1][0] * v1[0] + J2[1][1] * v1[1],
+            };
         }
-        return velocity;
+
+        return result;
     }
 
     std::array<std::array<Scalar, dim>, dim> position_Jacobian(
@@ -403,32 +507,6 @@ public:
         return J;
     }
 
-    std::array<std::array<Scalar, dim>, dim> finite_difference_Jacobian(
-        std::array<Scalar, dim> pos,
-        Scalar t) const
-    {
-        constexpr Scalar eps = 1e-6;
-        std::array<std::array<Scalar, dim>, dim> J{};
-
-        // For each dimension i, compute partial derivative with respect to pos[i]
-        for (int i = 0; i < dim; ++i) {
-            // Forward point
-            auto pos_plus = pos;
-            pos_plus[i] += eps;
-            auto val_plus = transform(pos_plus, t);
-
-            // Backward point
-            auto pos_minus = pos;
-            pos_minus[i] -= eps;
-            auto val_minus = transform(pos_minus, t);
-
-            // Central difference
-            for (int j = 0; j < dim; ++j) {
-                J[j][i] = (val_plus[j] - val_minus[j]) / (2 * eps);
-            }
-        }
-        return J;
-    }
 
 private:
     Transform<dim>& m_transform1; ///< First transformation

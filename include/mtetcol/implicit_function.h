@@ -6,17 +6,50 @@
 
 namespace mtetcol {
 
+/**
+ * @brief Base class for implicit functions in N-dimensional space.
+ *
+ * An implicit function defines a surface as the zero level set of a scalar function.
+ * The function returns positive values outside the surface, negative values inside,
+ * and zero on the surface.
+ *
+ * @tparam dim The dimension of the space (2 for 2D, 3 for 3D)
+ */
 template <int dim>
 class ImplicitFunction
 {
 public:
+    /**
+     * @brief Evaluates the implicit function at a given position.
+     *
+     * @param pos The position to evaluate at
+     * @return Scalar The signed distance to the surface (positive outside, negative inside)
+     */
     virtual Scalar value(std::array<Scalar, dim> pos) const = 0;
+
+    /**
+     * @brief Computes the gradient of the implicit function at a given position.
+     *
+     * @param pos The position to evaluate at
+     * @return std::array<Scalar, dim> The normalized gradient vector
+     */
     virtual std::array<Scalar, dim> gradient(std::array<Scalar, dim> pos) const = 0;
 };
 
+/**
+ * @brief Implicit function representing a 2D circle.
+ *
+ * The circle is defined by its radius and center point.
+ */
 class ImplicitCircle : public ImplicitFunction<2>
 {
 public:
+    /**
+     * @brief Constructs a new implicit circle.
+     *
+     * @param radius The radius of the circle
+     * @param center The center point of the circle
+     */
     ImplicitCircle(Scalar radius, std::array<Scalar, 2> center)
         : m_radius(radius)
         , m_center(center)
@@ -41,13 +74,24 @@ public:
     }
 
 private:
-    Scalar m_radius;
-    std::array<Scalar, 2> m_center;
+    Scalar m_radius; ///< The radius of the circle
+    std::array<Scalar, 2> m_center; ///< The center point of the circle
 };
 
+/**
+ * @brief Implicit function representing a 3D sphere.
+ *
+ * The sphere is defined by its radius and center point.
+ */
 class ImplicitSphere : public ImplicitFunction<3>
 {
 public:
+    /**
+     * @brief Constructs a new implicit sphere.
+     *
+     * @param radius The radius of the sphere
+     * @param center The center point of the sphere
+     */
     ImplicitSphere(Scalar radius, std::array<Scalar, 3> center)
         : m_radius(radius)
         , m_center(center)
@@ -74,13 +118,27 @@ public:
     }
 
 private:
-    Scalar m_radius;
-    std::array<Scalar, 3> m_center;
+    Scalar m_radius; ///< The radius of the sphere
+    std::array<Scalar, 3> m_center; ///< The center point of the sphere
 };
 
+/**
+ * @brief Implicit function representing a 3D torus.
+ *
+ * The torus is defined by two radii (R and r) and a center point.
+ * R is the distance from the center of the tube to the center of the torus,
+ * and r is the radius of the tube.
+ */
 class ImplicitTorus : public ImplicitFunction<3>
 {
 public:
+    /**
+     * @brief Constructs a new implicit torus.
+     *
+     * @param R The major radius (distance from center of tube to center of torus)
+     * @param r The minor radius (radius of the tube)
+     * @param center The center point of the torus
+     */
     ImplicitTorus(Scalar R, Scalar r, std::array<Scalar, 3> center)
         : m_R(R)
         , m_r(r)
@@ -126,9 +184,9 @@ public:
     }
 
 private:
-    Scalar m_R;
-    Scalar m_r;
-    std::array<Scalar, 3> m_center;
+    Scalar m_R; ///< The major radius of the torus
+    Scalar m_r; ///< The minor radius of the torus
+    std::array<Scalar, 3> m_center; ///< The center point of the torus
 };
 
 } // namespace mtetcol

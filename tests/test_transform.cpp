@@ -3,43 +3,58 @@
 
 #include <mtetcol/transform.h>
 
+template <int dim>
+void check_velocity(
+    const mtetcol::Transform<dim>& transform,
+    const std::array<mtetcol::Scalar, dim>& pos,
+    mtetcol::Scalar t)
+{
+    auto v = transform.velocity(pos, t);
+    auto v_fd = transform.finite_difference_velocity(pos, t);
+    for (int i = 0; i < dim; ++i) {
+        REQUIRE_THAT(v[i], Catch::Matchers::WithinAbs(v_fd[i], 1e-6));
+    }
+}
+
+template <int dim>
+void check_jacobian(
+    const mtetcol::Transform<dim>& transform,
+    const std::array<mtetcol::Scalar, dim>& pos,
+    mtetcol::Scalar t)
+{
+    auto J = transform.position_Jacobian(pos, t);
+    auto J_fd = transform.finite_difference_Jacobian(pos, t);
+    for (int i = 0; i < dim; ++i)
+        for (int j = 0; j < dim; ++j) {
+            REQUIRE_THAT(J[i][j], Catch::Matchers::WithinAbs(J_fd[i][j], 1e-6));
+        }
+}
+
 TEST_CASE("transform", "[mtetcol]")
 {
     SECTION("Rotation 2D") {
         mtetcol::Rotation<2> rotation({0.0, 0.0}, {0, 0});
 
         auto p0 = rotation.transform({1, 0}, 0);
-        auto v0 = rotation.velocity({1, 0}, 0);
         REQUIRE_THAT(p0[0], Catch::Matchers::WithinAbs(1, 1e-6));
         REQUIRE_THAT(p0[1], Catch::Matchers::WithinAbs(0, 1e-6));
-        REQUIRE_THAT(v0[0], Catch::Matchers::WithinAbs(0, 1e-6));
-        REQUIRE_THAT(v0[1], Catch::Matchers::WithinAbs(2 * M_PI, 1e-6));
+        check_velocity(rotation, {1, 0}, 0);
+        check_jacobian(rotation, {1, 0}, 0);
 
         auto p1 = rotation.transform({1, 0}, 0.5);
-        auto v1 = rotation.velocity({1, 0}, 0.5);
         REQUIRE_THAT(p1[0], Catch::Matchers::WithinAbs(-1, 1e-6));
         REQUIRE_THAT(p1[1], Catch::Matchers::WithinAbs(0, 1e-6));
-        REQUIRE_THAT(v1[0], Catch::Matchers::WithinAbs(0, 1e-6));
-        REQUIRE_THAT(v1[1], Catch::Matchers::WithinAbs(-2 * M_PI, 1e-6));
+        check_velocity(rotation, {1, 0}, 0.5);
+        check_jacobian(rotation, {1, 0}, 0.5);
 
         auto p2 = rotation.transform({1, 0}, 0.25);
-        auto v2 = rotation.velocity({1, 0}, 0.25);
         REQUIRE_THAT(p2[0], Catch::Matchers::WithinAbs(0, 1e-6));
         REQUIRE_THAT(p2[1], Catch::Matchers::WithinAbs(1, 1e-6));
-        REQUIRE_THAT(v2[0], Catch::Matchers::WithinAbs(-2 * M_PI, 1e-6));
-        REQUIRE_THAT(v2[1], Catch::Matchers::WithinAbs(0, 1e-6));
+        check_velocity(rotation, {1, 0}, 0.25);
+        check_jacobian(rotation, {1, 0}, 0.25);
 
-        auto v3 = rotation.velocity({1, 1}, 0.75);
-        auto v3_fd = rotation.finite_difference({1, 1}, 0.75);
-        REQUIRE_THAT(v3[0], Catch::Matchers::WithinAbs(v3_fd[0], 1e-6));
-        REQUIRE_THAT(v3[1], Catch::Matchers::WithinAbs(v3_fd[1], 1e-6));
-
-        auto J = rotation.position_Jacobian({1, 1}, 0.75);
-        auto J_fd = rotation.finite_difference_Jacobian({1, 1}, 0.75);
-        for (int i = 0; i < 2; ++i)
-            for (int j = 0; j < 2; ++j) {
-                REQUIRE_THAT(J[i][j], Catch::Matchers::WithinAbs(J_fd[i][j], 1e-6));
-            }
+        check_velocity(rotation, {1, 1}, 0.75);
+        check_jacobian(rotation, {1, 1}, 0.75);
     }
 
     SECTION("Compose") {
@@ -52,6 +67,8 @@ TEST_CASE("transform", "[mtetcol]")
             REQUIRE_THAT(p0[0], Catch::Matchers::WithinAbs(0, 1e-6));
             REQUIRE_THAT(p0[1], Catch::Matchers::WithinAbs(0, 1e-6));
             REQUIRE_THAT(p0[2], Catch::Matchers::WithinAbs(0, 1e-6));
+            check_velocity(compose, {0, 0, 0}, 0);
+            check_jacobian(compose, {0, 0, 0}, 0);
         }
 
         SECTION("Origin at t=0.5") {
@@ -59,6 +76,8 @@ TEST_CASE("transform", "[mtetcol]")
             REQUIRE_THAT(p0[0], Catch::Matchers::WithinAbs(0.5, 1e-6));
             REQUIRE_THAT(p0[1], Catch::Matchers::WithinAbs(0, 1e-6));
             REQUIRE_THAT(p0[2], Catch::Matchers::WithinAbs(0, 1e-6));
+            check_velocity(compose, {0, 0, 0}, 0.5);
+            check_jacobian(compose, {0, 0, 0}, 0.5);
         }
 
         SECTION("Origin at t=1") {
@@ -66,6 +85,8 @@ TEST_CASE("transform", "[mtetcol]")
             REQUIRE_THAT(p0[0], Catch::Matchers::WithinAbs(1, 1e-6));
             REQUIRE_THAT(p0[1], Catch::Matchers::WithinAbs(0, 1e-6));
             REQUIRE_THAT(p0[2], Catch::Matchers::WithinAbs(0, 1e-6));
+            check_velocity(compose, {0, 0, 0}, 1);
+            check_jacobian(compose, {0, 0, 0}, 1);
         }
 
         SECTION("[1, 0, 0] at t=0") {
@@ -73,6 +94,8 @@ TEST_CASE("transform", "[mtetcol]")
             REQUIRE_THAT(p0[0], Catch::Matchers::WithinAbs(1, 1e-6));
             REQUIRE_THAT(p0[1], Catch::Matchers::WithinAbs(0, 1e-6));
             REQUIRE_THAT(p0[2], Catch::Matchers::WithinAbs(0, 1e-6));
+            check_velocity(compose, {1, 0, 0}, 0);
+            check_jacobian(compose, {1, 0, 0}, 0);
         }
 
         SECTION("[1, 0, 0] at t=0.5") {
@@ -80,6 +103,8 @@ TEST_CASE("transform", "[mtetcol]")
             REQUIRE_THAT(p0[0], Catch::Matchers::WithinAbs(-0.5, 1e-6));
             REQUIRE_THAT(p0[1], Catch::Matchers::WithinAbs(0, 1e-6));
             REQUIRE_THAT(p0[2], Catch::Matchers::WithinAbs(0, 1e-6));
+            check_velocity(compose, {1, 0, 0}, 0.5);
+            check_jacobian(compose, {1, 0, 0}, 0.5);
         }
 
         SECTION("[1, 0, 0] at t=1.0") {
@@ -87,26 +112,8 @@ TEST_CASE("transform", "[mtetcol]")
             REQUIRE_THAT(p0[0], Catch::Matchers::WithinAbs(2, 1e-6));
             REQUIRE_THAT(p0[1], Catch::Matchers::WithinAbs(0, 1e-6));
             REQUIRE_THAT(p0[2], Catch::Matchers::WithinAbs(0, 1e-6));
-        }
-
-        SECTION("Jacobian: Origin at t = 0.5")
-        {
-            auto J = compose.position_Jacobian({0, 0, 0}, 0.5);
-            auto J_fd = compose.finite_difference_Jacobian({0, 0, 0}, 0.5);
-            for (int i = 0; i < 3; ++i)
-                for (int j = 0; j < 3; ++j) {
-                    REQUIRE_THAT(J[i][j], Catch::Matchers::WithinAbs(J_fd[i][j], 1e-6));
-                }
-        }
-
-        SECTION("Jacobian: [1, 0, 0] at t = 0.5")
-        {
-            auto J = compose.position_Jacobian({1, 0, 0}, 0.5);
-            auto J_fd = compose.finite_difference_Jacobian({1, 0, 0}, 0.5);
-            for (int i = 0; i < 3; ++i)
-                for (int j = 0; j < 3; ++j) {
-                    REQUIRE_THAT(J[i][j], Catch::Matchers::WithinAbs(J_fd[i][j], 1e-6));
-                }
+            check_velocity(compose, {1, 0, 0}, 1.0);
+            check_jacobian(compose, {1, 0, 0}, 1.0);
         }
     }
 }

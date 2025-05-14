@@ -36,7 +36,7 @@ include(CPM)
 CPMAddPackage(
     NAME spdlog
     GITHUB_REPOSITORY gabime/spdlog
-    GIT_TAG v1.15.1
+    GIT_TAG v1.15.3
 )
 
 set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON)

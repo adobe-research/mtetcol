@@ -22,8 +22,8 @@ target_link_libraries(mtetcol
     strong_type::strong_type
     smallvector::smallvector
     PRIVATE
-    mshio::mshio
     spdlog::spdlog
+    mshio::mshio
     unordered_dense::unordered_dense
 )
 
