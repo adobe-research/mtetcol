@@ -1,10 +1,9 @@
 #include <mtetcol/contour.h>
-#include <mtetcol/implicit_function.h>
 #include <mtetcol/io.h>
 #include <mtetcol/logger.h>
 #include <mtetcol/simplicial_column.h>
-#include <mtetcol/sweep_function.h>
-#include <mtetcol/transform.h>
+
+#include <stf/stf.h>
 
 using Scalar = mtetcol::Scalar;
 using Index = mtetcol::Index;
@@ -43,7 +42,7 @@ auto generate_grid(
 
 auto sample_time_derivative(
     mtetcol::SimplicialColumn<3>& columns,
-    const mtetcol::SpaceTimeFunction<2>& sweep_function,
+    const stf::SpaceTimeFunction<2>& sweep_function,
     size_t num_time_samples,
     bool cyclic) -> std::
     tuple<std::vector<mtetcol::Scalar>, std::vector<mtetcol::Scalar>, std::vector<mtetcol::Index>>
@@ -90,9 +89,9 @@ mtetcol::Contour<3> circle_rotation(mtetcol::SimplicialColumn<3>& columns)
     constexpr size_t num_time_samples_per_vertex = 64;
 
     std::array<Scalar, 2> center = {0.50, 0.50};
-    mtetcol::ImplicitCircle base_shape(0.3, {0.4, 0.5});
-    mtetcol::Rotation<2> rotation(center, {0, 0});
-    mtetcol::SweepFunction<2> sweep_function(base_shape, rotation);
+    stf::ImplicitCircle base_shape(0.3, {0.4, 0.5});
+    stf::Rotation<2> rotation(center, {0, 0});
+    stf::SweepFunction<2> sweep_function(base_shape, rotation);
 
     auto [time_samples, function_values, vertex_start_indices] =
         sample_time_derivative(columns, sweep_function, num_time_samples_per_vertex, true);
@@ -131,11 +130,11 @@ mtetcol::Contour<3> circle_scaling(mtetcol::SimplicialColumn<3>& columns)
     constexpr size_t num_time_samples_per_vertex = 64;
 
     std::array<Scalar, 2> center = {0.30, 0.50};
-    mtetcol::ImplicitCircle base_shape(0.2, center);
-    mtetcol::Translation<2> translation({-0.6, 0});
-    mtetcol::Scale<2> scaling({2, 2}, center);
-    mtetcol::Compose<2> transform(scaling, translation);
-    mtetcol::SweepFunction<2> sweep_function(base_shape, transform);
+    stf::ImplicitCircle base_shape(0.2, center);
+    stf::Translation<2> translation({-0.6, 0});
+    stf::Scale<2> scaling({2, 2}, center);
+    stf::Compose<2> transform(scaling, translation);
+    stf::SweepFunction<2> sweep_function(base_shape, transform);
 
     auto [time_samples, function_values, vertex_start_indices] =
         sample_time_derivative(columns, sweep_function, num_time_samples_per_vertex, false);
@@ -173,7 +172,7 @@ mtetcol::Contour<3> lemniscate_of_bernoulli(mtetcol::SimplicialColumn<3>& column
 
     constexpr size_t num_time_samples_per_vertex = 128;
 
-    mtetcol::ExplicitForm<2> sweep_function([](std::array<Scalar, 2> pos, Scalar t) {
+    stf::ExplicitForm<2> sweep_function([](std::array<Scalar, 2> pos, Scalar t) {
         Scalar x = std::abs(pos[0] - 0.5);
         Scalar y = pos[1] - 0.5;
         t = (t - 0.5) * 20;

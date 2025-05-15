@@ -1,11 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
-#include <mtetcol/implicit_function.h>
 #include <mtetcol/logger.h>
 #include <mtetcol/simplicial_column.h>
-#include <mtetcol/sweep_function.h>
-#include <mtetcol/transform.h>
+
+#include <stf/stf.h>
 
 #include <array>
 #include <cmath>
@@ -54,7 +53,7 @@ template <int dim, typename Scalar>
 void finite_difference(
     std::array<Scalar, dim> pos,
     Scalar t,
-    mtetcol::SweepFunction<dim>& sweep_function)
+    stf::SweepFunction<dim>& sweep_function)
 {
     constexpr Scalar delta = 1e-3;
     Scalar val = sweep_function.value(pos, t);
@@ -71,7 +70,7 @@ void finite_difference(
 template <int dim>
 void populate(
     mtetcol::SimplicialColumn<dim + 1>& columns,
-    mtetcol::SweepFunction<dim>& sweep_function,
+    stf::SweepFunction<dim>& sweep_function,
     size_t num_time_samples_per_vertex)
 {
     using namespace mtetcol;
@@ -109,15 +108,15 @@ template <int dim>
 void check_translation(mtetcol::SimplicialColumn<dim + 1>& columns)
 {
     if constexpr (dim == 2) {
-        mtetcol::ImplicitCircle base_shape(0.1, {0.3, 0.5});
-        mtetcol::Translation<2> translation({0.4, 0});
-        mtetcol::SweepFunction<2> sweep_function(base_shape, translation);
+        stf::ImplicitCircle base_shape(0.1, {0.3, 0.5});
+        stf::Translation<2> translation({0.4, 0});
+        stf::SweepFunction<2> sweep_function(base_shape, translation);
 
         populate(columns, sweep_function, 10);
     } else if (dim == 3) {
-        mtetcol::ImplicitSphere base_shape(0.1, {0.3, 0.5, 0.5});
-        mtetcol::Translation<3> translation({0.4, 0.0, 0.0});
-        mtetcol::SweepFunction<3> sweep_function(base_shape, translation);
+        stf::ImplicitSphere base_shape(0.1, {0.3, 0.5, 0.5});
+        stf::Translation<3> translation({0.4, 0.0, 0.0});
+        stf::SweepFunction<3> sweep_function(base_shape, translation);
 
         populate(columns, sweep_function, 10);
     }
@@ -136,15 +135,15 @@ template <int dim>
 void check_rotation(mtetcol::SimplicialColumn<dim + 1>& columns)
 {
     if constexpr (dim == 2) {
-        mtetcol::ImplicitCircle base_shape(0.1, {0.3, 0.5});
-        mtetcol::Rotation<2> rotation({0.5, 0.5}, {0, 0});
-        mtetcol::SweepFunction<2> sweep_function(base_shape, rotation);
+        stf::ImplicitCircle base_shape(0.1, {0.3, 0.5});
+        stf::Rotation<2> rotation({0.5, 0.5}, {0, 0});
+        stf::SweepFunction<2> sweep_function(base_shape, rotation);
 
         populate(columns, sweep_function, 10);
     } else if (dim == 3) {
-        mtetcol::ImplicitSphere base_shape(0.1, {0.3, 0.5, 0.5});
-        mtetcol::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
-        mtetcol::SweepFunction<3> sweep_function(base_shape, rotation);
+        stf::ImplicitSphere base_shape(0.1, {0.3, 0.5, 0.5});
+        stf::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
+        stf::SweepFunction<3> sweep_function(base_shape, rotation);
 
         populate(columns, sweep_function, 10);
     }
@@ -159,15 +158,15 @@ template <int dim>
 void check_overlapped_rotation(mtetcol::SimplicialColumn<dim + 1>& columns)
 {
     if constexpr (dim == 2) {
-        mtetcol::ImplicitCircle base_shape(0.35, {0.25, 0.5});
-        mtetcol::Rotation<2> rotation({0.5, 0.5}, {0, 0});
-        mtetcol::SweepFunction<2> sweep_function(base_shape, rotation);
+        stf::ImplicitCircle base_shape(0.35, {0.25, 0.5});
+        stf::Rotation<2> rotation({0.5, 0.5}, {0, 0});
+        stf::SweepFunction<2> sweep_function(base_shape, rotation);
 
         populate(columns, sweep_function, 10);
     } else if (dim == 3) {
-        mtetcol::ImplicitSphere base_shape(0.35, {0.25, 0.5, 0.5});
-        mtetcol::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
-        mtetcol::SweepFunction<3> sweep_function(base_shape, rotation);
+        stf::ImplicitSphere base_shape(0.35, {0.25, 0.5, 0.5});
+        stf::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
+        stf::SweepFunction<3> sweep_function(base_shape, rotation);
 
         populate(columns, sweep_function, 10);
     }

@@ -11,6 +11,7 @@ include(unordered_dense)
 include(spdlog)
 include(smallvector)
 include(mshio)
+include(stf)
 
 file(GLOB INC_FILES ${CMAKE_CURRENT_LIST_DIR}/include/mtetcol/*.h)
 file(GLOB SRC_FILES ${CMAKE_CURRENT_LIST_DIR}/src/*.cpp)
@@ -46,6 +47,7 @@ if (MTETCOL_BUILD_EXAMPLE)
         nonstd::indirect-value-lite
         spdlog::spdlog
         unordered_dense::unordered_dense
+        stf::stf
     )
     target_compile_features(sweep PRIVATE cxx_std_20)
 
@@ -56,6 +58,7 @@ if (MTETCOL_BUILD_EXAMPLE)
         nonstd::indirect-value-lite
         spdlog::spdlog
         unordered_dense::unordered_dense
+        stf::stf
     )
     target_compile_features(sweep2d PRIVATE cxx_std_20)
 endif()
@@ -74,6 +77,7 @@ if(MTETCOL_BUILD_TESTS)
         mtetcol::mtetcol
         spdlog::spdlog
         unordered_dense::unordered_dense
+        stf::stf
     )
     target_include_directories(mtetcol_tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
     target_compile_definitions(mtetcol_tests PRIVATE CATCH_CONFIG_ENABLE_BENCHMARKING)

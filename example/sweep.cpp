@@ -1,16 +1,15 @@
 #include <mtetcol/contour.h>
-#include <mtetcol/implicit_function.h>
 #include <mtetcol/io.h>
 #include <mtetcol/logger.h>
 #include <mtetcol/simplicial_column.h>
-#include <mtetcol/sweep_function.h>
-#include <mtetcol/transform.h>
 
 #include "flipping_donut.h"
 
 #include <ankerl/unordered_dense.h>
 #include <mtet/grid.h>
 #include <mtet/io.h>
+#include <stf/stf.h>
+#include <spdlog/fmt/ranges.h>
 
 #include <chrono>
 
@@ -48,7 +47,7 @@ std::tuple<std::vector<Scalar>, std::vector<Index>> generate_simpicial_column(
 
 auto sample_time_derivative(
     mtetcol::SimplicialColumn<4>& columns,
-    const mtetcol::SpaceTimeFunction<3>& sweep_function,
+    const stf::SpaceTimeFunction<3>& sweep_function,
     size_t num_time_samples,
     bool cyclic = false) -> std::
     tuple<std::vector<mtetcol::Scalar>, std::vector<mtetcol::Scalar>, std::vector<mtetcol::Index>>
@@ -87,177 +86,14 @@ auto sample_time_derivative(
     return {time_samples, function_values, vertex_start_indices};
 }
 
-mtetcol::Contour<4> sphere_translation(mtetcol::SimplicialColumn<4>& columns)
-{
-    using Scalar = mtetcol::Scalar;
-    using Index = mtetcol::Index;
-
-    constexpr size_t num_time_samples_per_vertex = 10;
-
-    mtetcol::ImplicitSphere base_shape(0.2, {0.25, 0.5, 0.5});
-    mtetcol::Translation<3> translation({-0.5, 0, 0});
-    mtetcol::SweepFunction<3> sweep_function(base_shape, translation);
-
-    auto [time_samples, function_values, vertex_start_indices] =
-        sample_time_derivative(columns, sweep_function, num_time_samples_per_vertex);
-
-    columns.set_time_samples(time_samples, function_values, vertex_start_indices);
-
-    auto contour = columns.extract_contour(0.0, false);
-    contour.triangulate_cycles();
-
-    size_t num_contour_vertices = contour.get_num_vertices();
-
-    function_values.clear();
-    function_values.resize(num_contour_vertices);
-    for (size_t i = 0; i < num_contour_vertices; ++i) {
-        auto pos = contour.get_vertex(i);
-        function_values[i] = sweep_function.value({pos[0], pos[1], pos[2]}, pos[3]);
-    }
-
-    std::vector<Scalar> function_gradients;
-    function_gradients.reserve(num_contour_vertices * 4);
-    for (size_t i = 0; i < num_contour_vertices; ++i) {
-        auto pos = contour.get_vertex(i);
-        std::array<Scalar, 4> gradient = sweep_function.gradient({pos[0], pos[1], pos[2]}, pos[3]);
-        for (int j = 0; j < 4; ++j) {
-            function_gradients.push_back(gradient[j]);
-        }
-    }
-
-    return contour.isocontour(function_values, function_gradients);
-}
-
-mtetcol::Contour<4> sphere_rotation(mtetcol::SimplicialColumn<4>& columns)
-{
-    using Scalar = mtetcol::Scalar;
-    using Index = mtetcol::Index;
-
-    constexpr size_t num_time_samples_per_vertex = 10;
-
-    mtetcol::ImplicitSphere base_shape(0.3, {0.4, 0.5, 0.5});
-    mtetcol::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
-    mtetcol::SweepFunction<3> sweep_function(base_shape, rotation);
-
-    auto [time_samples, function_values, vertex_start_indices] =
-        sample_time_derivative(columns, sweep_function, num_time_samples_per_vertex, true);
-
-    columns.set_time_samples(time_samples, function_values, vertex_start_indices);
-
-    auto contour = columns.extract_contour(0.0, true);
-    contour.triangulate_cycles();
-
-    size_t num_contour_vertices = contour.get_num_vertices();
-    function_values.clear();
-    function_values.resize(num_contour_vertices);
-    for (size_t i = 0; i < num_contour_vertices; ++i) {
-        auto pos = contour.get_vertex(i);
-        function_values[i] = sweep_function.value({pos[0], pos[1], pos[2]}, pos[3]);
-    }
-
-    std::vector<Scalar> function_gradients;
-    function_gradients.reserve(num_contour_vertices * 4);
-    for (size_t i = 0; i < num_contour_vertices; ++i) {
-        auto pos = contour.get_vertex(i);
-        std::array<Scalar, 4> gradient = sweep_function.gradient({pos[0], pos[1], pos[2]}, pos[3]);
-        for (int j = 0; j < 4; ++j) {
-            function_gradients.push_back(gradient[j]);
-        }
-    }
-
-    return contour.isocontour(function_values, function_gradients);
-}
-
-mtetcol::Contour<4> torus_rotation(mtetcol::SimplicialColumn<4>& columns)
+mtetcol::Contour<4> generate_contour(
+    mtetcol::SimplicialColumn<4>& columns,
+    const stf::SpaceTimeFunction<3>& sweep_function)
 {
     using Scalar = mtetcol::Scalar;
     using Index = mtetcol::Index;
 
     constexpr size_t num_time_samples_per_vertex = 64;
-
-    mtetcol::ImplicitTorus base_shape(0.2, 0.04, {0.25, 0.5, 0.5});
-    mtetcol::Rotation<3> rotation({0.25, 0.5, 0.5}, {1, 0, 0});
-    mtetcol::Translation<3> translation({-0.5, 0, 0});
-    mtetcol::Compose<3> flip(translation, rotation);
-    mtetcol::SweepFunction<3> sweep_function(base_shape, flip);
-
-    auto t0 = std::chrono::high_resolution_clock::now();
-    auto [time_samples, function_values, vertex_start_indices] =
-        sample_time_derivative(columns, sweep_function, num_time_samples_per_vertex);
-
-    auto t1 = std::chrono::high_resolution_clock::now();
-
-    columns.set_time_samples(time_samples, function_values, vertex_start_indices);
-
-    auto t2 = std::chrono::high_resolution_clock::now();
-
-    auto contour = columns.extract_contour(0.0, false);
-
-    auto t3 = std::chrono::high_resolution_clock::now();
-
-    contour.triangulate_cycles();
-
-    auto t4 = std::chrono::high_resolution_clock::now();
-
-    size_t num_contour_vertices = contour.get_num_vertices();
-    function_values.clear();
-    function_values.resize(num_contour_vertices);
-    for (size_t i = 0; i < num_contour_vertices; ++i) {
-        auto pos = contour.get_vertex(i);
-        function_values[i] = sweep_function.value({pos[0], pos[1], pos[2]}, pos[3]);
-    }
-
-    std::vector<Scalar> function_gradients;
-    function_gradients.reserve(num_contour_vertices * 4);
-    for (size_t i = 0; i < num_contour_vertices; ++i) {
-        auto pos = contour.get_vertex(i);
-        std::array<Scalar, 4> gradient = sweep_function.gradient({pos[0], pos[1], pos[2]}, pos[3]);
-        for (int j = 0; j < 4; ++j) {
-            function_gradients.push_back(gradient[j]);
-        }
-    }
-
-    auto t5 = std::chrono::high_resolution_clock::now();
-
-    auto result = contour.isocontour(function_values, function_gradients);
-    auto t6 = std::chrono::high_resolution_clock::now();
-
-    mtetcol::logger().info(
-        "sample_time_derivative: {} ms",
-        std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
-    mtetcol::logger().info(
-        "set_time_samples: {} ms",
-        std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
-    mtetcol::logger().info(
-        "extract_contour: {} ms",
-        std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count());
-    mtetcol::logger().info(
-        "triangulate_cycles: {} ms",
-        std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count());
-    mtetcol::logger().info(
-        "initialize function value: {} ms",
-        std::chrono::duration_cast<std::chrono::milliseconds>(t5 - t4).count());
-    mtetcol::logger().info(
-        "isocontour: {} ms",
-        std::chrono::duration_cast<std::chrono::milliseconds>(t6 - t5).count());
-
-    return result;
-}
-
-mtetcol::Contour<4> torus_flip(mtetcol::SimplicialColumn<4>& columns)
-{
-    using Scalar = mtetcol::Scalar;
-    using Index = mtetcol::Index;
-
-    constexpr size_t num_time_samples_per_vertex = 64;
-
-    mtetcol::ExplicitForm<3> sweep_function(
-        [](std::array<Scalar, 3> pos, Scalar t) {
-            return mtetcol::raw_flipping_donut({pos[0], pos[1], pos[2], t}).first;
-        },
-        [](std::array<Scalar, 3> pos, Scalar t) {
-            return mtetcol::raw_flipping_donut({pos[0], pos[1], pos[2], t}).second[3];
-        });
 
     auto t0 = std::chrono::high_resolution_clock::now();
     auto [time_samples, function_values, vertex_start_indices] =
@@ -313,6 +149,59 @@ mtetcol::Contour<4> torus_flip(mtetcol::SimplicialColumn<4>& columns)
     return result;
 }
 
+mtetcol::Contour<4> sphere_translation(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitSphere base_shape(0.2, {0.25, 0.5, 0.5});
+    stf::Translation<3> translation({-0.5, 0, 0});
+    stf::SweepFunction<3> sweep_function(base_shape, translation);
+
+    return generate_contour(columns, sweep_function);
+}
+
+mtetcol::Contour<4> sphere_rotation(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitSphere base_shape(0.3, {0.4, 0.5, 0.5});
+    stf::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
+    stf::SweepFunction<3> sweep_function(base_shape, rotation);
+
+    return generate_contour(columns, sweep_function);
+}
+
+mtetcol::Contour<4> torus_rotation(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitTorus base_shape(0.2, 0.04, {0.25, 0.5, 0.5});
+    stf::Rotation<3> rotation({0.25, 0.5, 0.5}, {1, 0, 0});
+    stf::Translation<3> translation({-0.5, 0, 0});
+    stf::Compose<3> flip(translation, rotation);
+    stf::SweepFunction<3> sweep_function(base_shape, flip);
+
+    return generate_contour(columns, sweep_function);
+}
+
+mtetcol::Contour<4> torus_flip(mtetcol::SimplicialColumn<4>& columns)
+{
+    using Scalar = mtetcol::Scalar;
+    stf::ExplicitForm<3> sweep_function(
+        [](std::array<Scalar, 3> pos, Scalar t) {
+            return mtetcol::raw_flipping_donut({pos[0], pos[1], pos[2], t}).first;
+        },
+        [](std::array<Scalar, 3> pos, Scalar t) {
+            return mtetcol::raw_flipping_donut({pos[0], pos[1], pos[2], t}).second[3];
+        });
+
+    return generate_contour(columns, sweep_function);
+}
+
+mtetcol::Contour<4> elbow(mtetcol::SimplicialColumn<4>& columns)
+{
+    //stf::ImplicitTorus base_shape(0.2, 0.05, {0.0, 0.0, 0.0});
+    stf::ImplicitSphere base_shape(0.2, {0.0, 0.0, 0.0});
+    stf::Polyline<3> polyline({{0.3, 0.3, 0.3}, {0.7, 0.3, 0.3}, {0.7, 0.7, 0.3}});
+    stf::SweepFunction<3> sweep_function(base_shape, polyline);
+
+    return generate_contour(columns, sweep_function);
+}
+
 int main(int argc, char** argv)
 {
     mtetcol::logger().set_level(spdlog::level::debug);
@@ -332,8 +221,9 @@ int main(int argc, char** argv)
 
     // auto isocontour = sphere_translation(columns);
     // auto isocontour = sphere_rotation(columns);
-    auto isocontour = torus_rotation(columns);
+    // auto isocontour = torus_rotation(columns);
     // auto isocontour = torus_flip(columns);
+    auto isocontour = elbow(columns);
 
     isocontour.triangulate_cycles();
     mtetcol::save_contour("contour.msh", isocontour);

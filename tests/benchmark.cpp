@@ -2,14 +2,12 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <mtetcol/contour.h>
-#include <mtetcol/implicit_function.h>
 #include <mtetcol/logger.h>
 #include <mtetcol/simplicial_column.h>
-#include <mtetcol/sweep_function.h>
-#include <mtetcol/transform.h>
 
 #include <ankerl/unordered_dense.h>
 #include <mtet/grid.h>
+#include <stf/stf.h>
 
 template <typename Scalar, typename Index>
 std::tuple<std::vector<Scalar>, std::vector<Index>> generate_simpicial_column(
@@ -45,7 +43,7 @@ std::tuple<std::vector<Scalar>, std::vector<Index>> generate_simpicial_column(
 
 auto sample_time_derivative(
     mtetcol::SimplicialColumn<4>& columns,
-    const mtetcol::SweepFunction<3>& sweep_function,
+    const stf::SweepFunction<3>& sweep_function,
     size_t num_time_samples) -> std::
     tuple<std::vector<mtetcol::Scalar>, std::vector<mtetcol::Scalar>, std::vector<mtetcol::Index>>
 {
@@ -93,11 +91,11 @@ TEST_CASE("benchmark", "[mtetcol][.benchmark]")
 
     mtetcol::logger().set_level(spdlog::level::warn);
 
-    mtetcol::ImplicitTorus base_shape(0.2, 0.04, {0.25, 0.5, 0.5});
-    mtetcol::Rotation<3> rotation({0.25, 0.5, 0.5}, {1, 0, 0});
-    mtetcol::Translation<3> translation({-0.5, 0, 0});
-    mtetcol::Compose<3> flip(translation, rotation);
-    mtetcol::SweepFunction<3> sweep_function(base_shape, flip);
+    stf::ImplicitTorus base_shape(0.2, 0.04, {0.25, 0.5, 0.5});
+    stf::Rotation<3> rotation({0.25, 0.5, 0.5}, {1, 0, 0});
+    stf::Translation<3> translation({-0.5, 0, 0});
+    stf::Compose<3> flip(translation, rotation);
+    stf::SweepFunction<3> sweep_function(base_shape, flip);
 
     auto [time_samples, function_values, vertex_start_indices] =
         sample_time_derivative(columns, sweep_function, num_time_samples_per_vertex);

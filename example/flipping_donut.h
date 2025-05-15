@@ -1,7 +1,6 @@
 #pragma once
 
 #include <mtetcol/common.h>
-#include <mtetcol/sweep_function.h>
 
 #include <array>
 #include <cmath>
