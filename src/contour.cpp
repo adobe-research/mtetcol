@@ -387,7 +387,7 @@ std::vector<Index> compute_zero_crossing_segments(
 {
     static_assert(dim == 3 || dim == 4, "dim must be 3 or 4");
     size_t num_cycles = contour.get_num_cycles();
-    llvm_vecsmall::SmallVector<SignedIndex, 4> zero_crossing_segments;
+    llvm_vecsmall::SmallVector<SignedIndex, 16> zero_crossing_segments;
     std::vector<Index> zero_crossing_segment_indices;
     zero_crossing_segment_indices.reserve(num_cycles + 1);
     zero_crossing_segment_indices.push_back(0);
@@ -401,29 +401,41 @@ std::vector<Index> compute_zero_crossing_segments(
             Index seg_id = index(sid);
             if (zero_crossing_vertices[seg_id] != invalid_index) {
                 zero_crossing_segments.push_back(sid);
-                if (zero_crossing_segments.size() > 2) {
-                    throw std::runtime_error("Cycle has more than 2 zero crossings, please call "
-                                             "triangulate_cycles() first");
-                }
             }
         }
         if (!zero_crossing_segments.empty()) {
             // Determine segment orientation
-            assert(zero_crossing_segments.size() == 2);
-            auto seg_id_0 = index(zero_crossing_segments[0]);
-            bool seg_ori_0 = orientation(zero_crossing_segments[0]);
-            auto seg_id_1 = index(zero_crossing_segments[1]);
-            bool seg_ori_1 = orientation(zero_crossing_segments[1]);
+            SignedIndex first_segment = zero_crossing_segments[0];
+            Index first_segment_id = index(first_segment);
+            bool first_segment_ori = orientation(first_segment);
+            Index first_vertex_id =
+                contour.get_segment(first_segment_id)[first_segment_ori ? 0 : 1];
+            bool first_vertex_sign = function_values[first_vertex_id] >= 0;
+            size_t parity = first_vertex_sign ? 1 : 0;
 
-            Index v0 = contour.get_segment(seg_id_0)[seg_ori_0 ? 0 : 1];
-            if (function_values[v0] < 0) {
+            // Add diagonal segments so that the negative region stays connected.
+            // The number of zero-crossing segments is assumed to be even because each crossing
+            // corresponds to a transition between positive and negative regions, forming pairs.
+            // Parity is used to determine the starting point for pairing segments, ensuring
+            // consistent connectivity. The index manipulation below ensures that segments are
+            // paired correctly based on the calculated parity.
+            size_t num_zero_crossing_segments = zero_crossing_segments.size();
+            assert(num_zero_crossing_segments % 2 == 0);
+            for (size_t j = 0; j < num_zero_crossing_segments; j += 2) {
+                size_t idx0 = (j + parity) % num_zero_crossing_segments;
+                size_t idx1 = (j + 1 + parity) % num_zero_crossing_segments;
+
+                auto seg_id_0 = index(zero_crossing_segments[idx0]);
+                bool seg_ori_0 = orientation(zero_crossing_segments[idx0]);
+                auto seg_id_1 = index(zero_crossing_segments[idx1]);
+                bool seg_ori_1 = orientation(zero_crossing_segments[idx1]);
+
+                Index v0 = contour.get_segment(seg_id_0)[seg_ori_0 ? 1 : 0];
+                assert(function_values[v0] >= 0);
+
                 result.add_segment(
                     zero_crossing_vertices[seg_id_1],
                     zero_crossing_vertices[seg_id_0]);
-            } else {
-                result.add_segment(
-                    zero_crossing_vertices[seg_id_0],
-                    zero_crossing_vertices[seg_id_1]);
             }
         }
         zero_crossing_segment_indices.push_back(result.get_num_segments());
@@ -580,7 +592,6 @@ Contour<4> Contour<4>::isocontour(
         for (auto cid : polyhedron) {
             Index seg_start = zero_crossing_segment_indices[index(cid)];
             Index seg_end = zero_crossing_segment_indices[index(cid) + 1];
-            assert(seg_end - seg_start < 2);
             bool cycle_ori = orientation(cid);
 
             for (Index seg_id = seg_start; seg_id < seg_end; seg_id++) {

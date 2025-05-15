@@ -8,8 +8,8 @@
 #include <ankerl/unordered_dense.h>
 #include <mtet/grid.h>
 #include <mtet/io.h>
-#include <stf/stf.h>
 #include <spdlog/fmt/ranges.h>
+#include <stf/stf.h>
 
 #include <chrono>
 
@@ -109,8 +109,8 @@ mtetcol::Contour<4> generate_contour(
 
     auto t3 = std::chrono::high_resolution_clock::now();
 
-    contour.triangulate_cycles();
-    mtetcol::save_contour("contour_grid.msh", contour);
+    // contour.triangulate_cycles();
+    // mtetcol::save_contour("contour_grid.msh", contour);
 
     auto t4 = std::chrono::high_resolution_clock::now();
 
@@ -194,7 +194,7 @@ mtetcol::Contour<4> torus_flip(mtetcol::SimplicialColumn<4>& columns)
 
 mtetcol::Contour<4> elbow(mtetcol::SimplicialColumn<4>& columns)
 {
-    //stf::ImplicitTorus base_shape(0.2, 0.05, {0.0, 0.0, 0.0});
+    // stf::ImplicitTorus base_shape(0.2, 0.05, {0.0, 0.0, 0.0});
     stf::ImplicitSphere base_shape(0.2, {0.0, 0.0, 0.0});
     stf::Polyline<3> polyline({{0.3, 0.3, 0.3}, {0.7, 0.3, 0.3}, {0.7, 0.7, 0.3}});
     stf::SweepFunction<3> sweep_function(base_shape, polyline);
@@ -222,8 +222,8 @@ int main(int argc, char** argv)
     // auto isocontour = sphere_translation(columns);
     // auto isocontour = sphere_rotation(columns);
     // auto isocontour = torus_rotation(columns);
-    // auto isocontour = torus_flip(columns);
-    auto isocontour = elbow(columns);
+    auto isocontour = torus_flip(columns);
+    // auto isocontour = elbow(columns);
 
     isocontour.triangulate_cycles();
     mtetcol::save_contour("contour.msh", isocontour);
