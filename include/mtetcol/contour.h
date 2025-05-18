@@ -286,8 +286,11 @@ public:
 
     /**
      * @brief Update the contour so that all cycles are triangles.
+     *
+     * @param optimal_triangulation (optional) A boolean flag indicating whether to use optimal
+     * triangulation. (Only apply to quad faces for now)
      */
-    void triangulate_cycles();
+    void triangulate_cycles(bool optimal_triangulation = true);
 
     /**
      * @brief Compute the isocontour of this contour.

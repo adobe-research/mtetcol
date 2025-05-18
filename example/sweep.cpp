@@ -302,8 +302,8 @@ mtetcol::Contour<4> sphere_spiral(mtetcol::SimplicialColumn<4>& columns)
 
 mtetcol::Contour<4> knot(mtetcol::SimplicialColumn<4>& columns)
 {
-    stf::ImplicitSphere base_shape(0.025, {0.0, 0.0, 0.0});
-    // stf::ImplicitCapsule<3> base_shape(0.01, {0.0, 0.0, 0.0}, {0.1, 0, 0});
+    // stf::ImplicitSphere base_shape(0.025, {0.0, 0.0, 0.0});
+    stf::ImplicitCapsule<3> base_shape(0.01, {-0.1, 0.0, 0.0}, {0.1, 0, 0});
     std::vector<std::array<stf::Scalar, 3>> samples{
         {0.4000, 0.0000, 0.0000},    {0.4000, 0.0832, 0.1464},    {0.1708, 0.0915, 0.2424},
         {0.0174, 0.0985, 0.1732},    {-0.1140, 0.1045, 0.1139},   {-0.0335, 0.1510, -0.1139},
@@ -349,14 +349,14 @@ int main(int argc, char** argv)
     // auto isocontour = sphere_translation(columns);
     // auto isocontour = sphere_rotation(columns);
     // auto isocontour = torus_rotation(columns);
-    auto isocontour = torus_flip(columns);
+    // auto isocontour = torus_flip(columns);
     // auto isocontour = elbow(columns);
     // auto isocontour = bezier(columns);
     // auto isocontour = blending(columns);
     // auto isocontour = blending_spheres(columns);
     // auto isocontour = sphere_spiral(columns);
     // auto isocontour = union_of_sweeps(columns);
-    // auto isocontour = knot(columns);
+    auto isocontour = knot(columns);
 
     isocontour.triangulate_cycles();
     mtetcol::save_contour("contour.msh", isocontour);
