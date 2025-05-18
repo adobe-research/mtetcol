@@ -126,7 +126,7 @@ std::vector<Index> triangulate(
 
                 Scalar diag_02 = 0;
                 Scalar diag_13 = 0;
-                for (int d = 0; d < dim + 1; d++) {
+                for (int d = 0; d < dim; d++) {
                     diag_02 += (v2[d] - v0[d]) * (v2[d] - v0[d]);
                     diag_13 += (v3[d] - v1[d]) * (v3[d] - v1[d]);
                 }
