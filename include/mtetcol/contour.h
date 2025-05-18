@@ -294,12 +294,14 @@ public:
      *
      * @param function_values A span of function values at the vertices of the contour.
      * @param function_gradients (optional) A span of function gradients at the vertices of the contour.
+     * @param use_snapping (optional) A boolean flag indicating whether to use snapping.
      *
      * @return A Contour object representing the isocontour.
      */
     Contour<dim> isocontour(
         std::span<Scalar> function_values,
-        std::span<Scalar> function_gradients = {}) const;
+        std::span<Scalar> function_gradients = {},
+        bool use_snapping = false) const;
 
 private:
     void check_all_segments() const {

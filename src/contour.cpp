@@ -197,48 +197,6 @@ std::vector<Index> triangulate(
     return cycle_to_triangle_map;
 }
 
-template <int dim>
-std::vector<Index> compute_zero_crossing_vertices(
-    const Contour<dim>& contour,
-    std::span<const Scalar> function_values,
-    Contour<dim>& result)
-{
-    static_assert(dim == 3 || dim == 4, "dim must be 3 or 4");
-    size_t num_segments = contour.get_num_segments();
-    std::vector<Index> zero_crossing_vertices(num_segments, invalid_index);
-
-    auto interpolate_segment = [&](Index v0, Index v1) {
-        Scalar t = function_values[v0] / (function_values[v0] - function_values[v1]);
-        auto pos0 = contour.get_vertex(v0);
-        auto pos1 = contour.get_vertex(v1);
-        if constexpr (dim == 3) {
-            result.add_vertex(
-                {pos0[0] + t * (pos1[0] - pos0[0]),
-                 pos0[1] + t * (pos1[1] - pos0[1]),
-                 pos0[2] + t * (pos1[2] - pos0[2])});
-        } else if constexpr (dim == 4) {
-            result.add_vertex(
-                {pos0[0] + t * (pos1[0] - pos0[0]),
-                 pos0[1] + t * (pos1[1] - pos0[1]),
-                 pos0[2] + t * (pos1[2] - pos0[2]),
-                 pos0[3] + t * (pos1[3] - pos0[3])});
-        }
-        return static_cast<Index>(result.get_num_vertices() - 1);
-    };
-
-    for (size_t i = 0; i < num_segments; i++) {
-        auto seg = contour.get_segment(i);
-        Index v0 = seg[0];
-        Index v1 = seg[1];
-        if (function_values[v0] >= 0 && function_values[v1] < 0 ||
-            function_values[v0] < 0 && function_values[v1] >= 0) {
-            zero_crossing_vertices[i] = interpolate_segment(v0, v1);
-        }
-    }
-
-    return zero_crossing_vertices;
-}
-
 // compute a cubic root in [0,1] given values and gradients at two endpoints
 Scalar get_cubic_root(Scalar val1, Scalar val2, Scalar g1, Scalar g2)
 {
@@ -320,58 +278,118 @@ std::vector<Index> compute_zero_crossing_vertices(
     const Contour<dim>& contour,
     std::span<const Scalar> function_values,
     std::span<const Scalar> function_gradients,
+    bool use_snapping,
     Contour<dim>& result)
 {
     static_assert(dim == 3 || dim == 4, "dim must be 3 or 4");
     size_t num_segments = contour.get_num_segments();
     std::vector<Index> zero_crossing_vertices(num_segments, invalid_index);
 
-    auto interpolate_segment = [&](Index v0, Index v1) {
-        Scalar val0 = function_values[v0];
-        Scalar val1 = function_values[v1];
-        auto pos0 = contour.get_vertex(v0);
-        auto pos1 = contour.get_vertex(v1);
-        auto grad0 = function_gradients.subspan(v0 * dim, dim);
-        auto grad1 = function_gradients.subspan(v1 * dim, dim);
-        // directional derivatives
-        Scalar g0, g1;
-        // since the interval is scaled to (0,1), we don't normalize by dividing by the length of
-        // p0p1
-        if constexpr (dim == 3) {
-            g0 = grad0[0] * (pos1[0] - pos0[0]) + grad0[1] * (pos1[1] - pos0[1]) +
-                 grad0[2] * (pos1[2] - pos0[2]);
-            g1 = grad1[0] * (pos1[0] - pos0[0]) + grad1[1] * (pos1[1] - pos0[1]) +
-                 grad1[2] * (pos1[2] - pos0[2]);
-        } else if constexpr (dim == 4) {
-            g0 = grad0[0] * (pos1[0] - pos0[0]) + grad0[1] * (pos1[1] - pos0[1]) +
-                 grad0[2] * (pos1[2] - pos0[2]) + grad0[3] * (pos1[3] - pos0[3]);
-            g1 = grad1[0] * (pos1[0] - pos0[0]) + grad1[1] * (pos1[1] - pos0[1]) +
-                 grad1[2] * (pos1[2] - pos0[2]) + grad1[3] * (pos1[3] - pos0[3]);
-        }
+    bool has_gradients = function_gradients.size() == function_values.size() * dim;
 
-        Scalar t = get_cubic_root(val0, val1, g0, g1);
-        if constexpr (dim == 3) {
-            result.add_vertex(
-                {pos0[0] + t * (pos1[0] - pos0[0]),
-                 pos0[1] + t * (pos1[1] - pos0[1]),
-                 pos0[2] + t * (pos1[2] - pos0[2])});
-        } else if constexpr (dim == 4) {
-            result.add_vertex(
-                {pos0[0] + t * (pos1[0] - pos0[0]),
-                 pos0[1] + t * (pos1[1] - pos0[1]),
-                 pos0[2] + t * (pos1[2] - pos0[2]),
-                 pos0[3] + t * (pos1[3] - pos0[3])});
-        }
-        return static_cast<Index>(result.get_num_vertices() - 1);
-    };
+    // For snapping
+    constexpr Scalar snap_alpha = 0.1;
+    std::vector<Index> snap_vertices(function_values.size(), invalid_index);
+    std::vector<Scalar> snap_alphas(function_values.size(), 1);
 
+    // Store computed vertex positions instead of adding them immediately
+    std::vector<std::array<Scalar, dim>> vertex_positions;
+
+    // First pass: compute all potential vertices
     for (size_t i = 0; i < num_segments; i++) {
         auto seg = contour.get_segment(i);
         Index v0 = seg[0];
         Index v1 = seg[1];
+
         if (function_values[v0] >= 0 && function_values[v1] < 0 ||
             function_values[v0] < 0 && function_values[v1] >= 0) {
-            zero_crossing_vertices[i] = interpolate_segment(v0, v1);
+            const Scalar val0 = function_values[v0];
+            const Scalar val1 = function_values[v1];
+            auto pos0 = contour.get_vertex(v0);
+            auto pos1 = contour.get_vertex(v1);
+            Scalar t;
+
+            if (has_gradients) {
+                auto grad0 = function_gradients.subspan(v0 * dim, dim);
+                auto grad1 = function_gradients.subspan(v1 * dim, dim);
+                // directional derivatives
+                Scalar g0, g1;
+                // since the interval is scaled to (0,1), we don't normalize by dividing by the
+                // length of p0p1
+                if constexpr (dim == 3) {
+                    g0 = grad0[0] * (pos1[0] - pos0[0]) + grad0[1] * (pos1[1] - pos0[1]) +
+                         grad0[2] * (pos1[2] - pos0[2]);
+                    g1 = grad1[0] * (pos1[0] - pos0[0]) + grad1[1] * (pos1[1] - pos0[1]) +
+                         grad1[2] * (pos1[2] - pos0[2]);
+                } else if constexpr (dim == 4) {
+                    g0 = grad0[0] * (pos1[0] - pos0[0]) + grad0[1] * (pos1[1] - pos0[1]) +
+                         grad0[2] * (pos1[2] - pos0[2]) + grad0[3] * (pos1[3] - pos0[3]);
+                    g1 = grad1[0] * (pos1[0] - pos0[0]) + grad1[1] * (pos1[1] - pos0[1]) +
+                         grad1[2] * (pos1[2] - pos0[2]) + grad1[3] * (pos1[3] - pos0[3]);
+                }
+                t = get_cubic_root(val0, val1, g0, g1);
+            } else {
+                t = val0 / (val0 - val1);
+            }
+
+            // Compute the position
+            auto& position = vertex_positions.emplace_back();
+            for (int d = 0; d < dim; d++) {
+                position[d] = pos0[d] + t * (pos1[d] - pos0[d]);
+            }
+
+            // Record this as the current vertex for this segment
+            zero_crossing_vertices[i] = static_cast<Index>(vertex_positions.size() - 1);
+
+            // Update snapping information if needed
+            if (use_snapping) {
+                if (t < snap_alpha && t < snap_alphas[v0]) {
+                    snap_vertices[v0] = static_cast<Index>(vertex_positions.size() - 1);
+                    snap_alphas[v0] = t;
+                } else if (t > 1 - snap_alpha && (1 - t) < snap_alphas[v1]) {
+                    snap_vertices[v1] = static_cast<Index>(vertex_positions.size() - 1);
+                    snap_alphas[v1] = 1 - t;
+                }
+            }
+        }
+    }
+
+    // Second pass: apply snapping and determine which vertices are actually used
+    std::vector<bool> vertex_used(vertex_positions.size(), false);
+
+    for (size_t i = 0; i < num_segments; i++) {
+        if (zero_crossing_vertices[i] == invalid_index) {
+            continue;
+        }
+
+        if (use_snapping) {
+            auto seg = contour.get_segment(i);
+            Index v0 = seg[0];
+            Index v1 = seg[1];
+            if (snap_vertices[v0] != invalid_index) {
+                zero_crossing_vertices[i] = snap_vertices[v0];
+            } else if (snap_vertices[v1] != invalid_index) {
+                zero_crossing_vertices[i] = snap_vertices[v1];
+            }
+        }
+
+        vertex_used[zero_crossing_vertices[i]] = true;
+    }
+
+    // Final pass: add only the vertices that are actually used and update indices
+    std::vector<Index> vertex_mapping(vertex_positions.size(), invalid_index);
+
+    for (size_t i = 0; i < vertex_positions.size(); i++) {
+        if (vertex_used[i]) {
+            result.add_vertex(vertex_positions[i]);
+            vertex_mapping[i] = static_cast<Index>(result.get_num_vertices() - 1);
+        }
+    }
+
+    // Update the zero_crossing_vertices with the new indices
+    for (size_t i = 0; i < num_segments; i++) {
+        if (zero_crossing_vertices[i] != invalid_index) {
+            zero_crossing_vertices[i] = vertex_mapping[zero_crossing_vertices[i]];
         }
     }
 
@@ -429,6 +447,11 @@ std::vector<Index> compute_zero_crossing_segments(
                 bool seg_ori_0 = orientation(zero_crossing_segments[idx0]);
                 auto seg_id_1 = index(zero_crossing_segments[idx1]);
                 bool seg_ori_1 = orientation(zero_crossing_segments[idx1]);
+
+                // skip degenerate segment
+                if (zero_crossing_vertices[seg_id_0] == zero_crossing_vertices[seg_id_1]) {
+                    continue;
+                }
 
                 Index v0 = contour.get_segment(seg_id_0)[seg_ori_0 ? 1 : 0];
                 assert(function_values[v0] >= 0);
@@ -540,19 +563,17 @@ void Contour<4>::triangulate_cycles()
 template <>
 Contour<3> Contour<3>::isocontour(
     std::span<Scalar> function_values,
-    std::span<Scalar> function_gradients) const
+    std::span<Scalar> function_gradients, bool use_snapping) const
 {
     assert(get_num_vertices() == function_values.size());
-    bool has_gradients = function_gradients.size() == get_num_vertices() * 3;
     Contour<3> result;
 
-    std::vector<Index> zero_crossing_vertices;
-    if (has_gradients) {
-        zero_crossing_vertices =
-            compute_zero_crossing_vertices(*this, function_values, function_gradients, result);
-    } else {
-        zero_crossing_vertices = compute_zero_crossing_vertices(*this, function_values, result);
-    }
+    std::vector<Index> zero_crossing_vertices = compute_zero_crossing_vertices(
+        *this,
+        function_values,
+        function_gradients,
+        use_snapping,
+        result);
     compute_zero_crossing_segments(*this, function_values, zero_crossing_vertices, result);
 
 #ifndef NDEBUG
@@ -567,19 +588,17 @@ Contour<3> Contour<3>::isocontour(
 template <>
 Contour<4> Contour<4>::isocontour(
     std::span<Scalar> function_values,
-    std::span<Scalar> function_gradients) const
+    std::span<Scalar> function_gradients, bool use_snapping) const
 {
     assert(get_num_vertices() == function_values.size());
-    bool has_gradients = function_gradients.size() == get_num_vertices() * 4;
     Contour<4> result;
 
-    std::vector<Index> zero_crossing_vertices;
-    if (has_gradients) {
-        zero_crossing_vertices =
-            compute_zero_crossing_vertices(*this, function_values, function_gradients, result);
-    } else {
-        zero_crossing_vertices = compute_zero_crossing_vertices(*this, function_values, result);
-    }
+    std::vector<Index> zero_crossing_vertices = compute_zero_crossing_vertices(
+        *this,
+        function_values,
+        function_gradients,
+        use_snapping,
+        result);
 
     std::vector<Index> zero_crossing_segment_indices =
         compute_zero_crossing_segments(*this, function_values, zero_crossing_vertices, result);

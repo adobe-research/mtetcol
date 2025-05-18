@@ -119,7 +119,7 @@ mtetcol::Contour<3> circle_rotation(mtetcol::SimplicialColumn<3>& columns)
         }
     }
 
-    return contour.isocontour(function_values, function_gradients);
+    return contour.isocontour(function_values, function_gradients, true);
 }
 
 mtetcol::Contour<3> circle_scaling(mtetcol::SimplicialColumn<3>& columns)
@@ -162,7 +162,7 @@ mtetcol::Contour<3> circle_scaling(mtetcol::SimplicialColumn<3>& columns)
         }
     }
 
-    return contour.isocontour(function_values, function_gradients);
+    return contour.isocontour(function_values, function_gradients, true);
 }
 
 mtetcol::Contour<3> lemniscate_of_bernoulli(mtetcol::SimplicialColumn<3>& columns)
@@ -208,7 +208,7 @@ mtetcol::Contour<3> lemniscate_of_bernoulli(mtetcol::SimplicialColumn<3>& column
         }
     }
 
-    return contour.isocontour(function_values, function_gradients);
+    return contour.isocontour(function_values, function_gradients, true);
 }
 
 int main(int argc, char** argv)
