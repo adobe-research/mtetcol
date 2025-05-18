@@ -28,11 +28,14 @@ void print_polyhedron(const Contour<4>& contour, Index polyhedron_id)
     }
 }
 
+template <int dim>
 std::vector<Index> triangulate(
+    std::vector<Scalar>& vertices,
     std::vector<Index>& segments,
     std::vector<SignedIndex>& cycles,
     std::vector<Index>& cycle_indices)
 {
+    assert(vertices.size() % (dim + 1) == 0);
     size_t num_cycles = cycle_indices.size() - 1;
 
     EdgeMap diagonal_map;
@@ -104,8 +107,26 @@ std::vector<Index> triangulate(
                 cycle_vertices[j] = segment[0];
             }
 
-            if (std::min(cycle_vertices[0], cycle_vertices[2]) <
-                std::min(cycle_vertices[1], cycle_vertices[3])) {
+            std::span<Scalar, dim + 1> v0{vertices.data() + cycle_vertices[0] * (dim + 1), dim + 1};
+            std::span<Scalar, dim + 1> v1{vertices.data() + cycle_vertices[1] * (dim + 1), dim + 1};
+            std::span<Scalar, dim + 1> v2{vertices.data() + cycle_vertices[2] * (dim + 1), dim + 1};
+            std::span<Scalar, dim + 1> v3{vertices.data() + cycle_vertices[3] * (dim + 1), dim + 1};
+
+            Scalar diag_02 = 0;
+            Scalar diag_13 = 0;
+            for (int d = 0; d < dim + 1; d++) {
+                diag_02 += (v2[d] - v0[d]) * (v2[d] - v0[d]);
+                diag_13 += (v3[d] - v1[d]) * (v3[d] - v1[d]);
+            }
+            bool use_diag_02 = diag_02 < diag_13;
+            if (std::abs(diag_02 - diag_13) < 1e-6) {
+                // Two diagonals are almost equal, uniquely pick the one with smaller starting
+                // vertex index
+                use_diag_02 = std::min(cycle_vertices[0], cycle_vertices[2]) <
+                              std::min(cycle_vertices[1], cycle_vertices[3]);
+            }
+
+            if (use_diag_02) {
                 // Insert diagonal 0-2
                 SignedIndex diag_index = add_diagonal(cycle_vertices[0], cycle_vertices[2], true);
 
@@ -493,7 +514,8 @@ void map_cycle_regularity(
 template <>
 void Contour<3>::triangulate_cycles()
 {
-    auto cycle_to_triangle_map = triangulate(m_segments, m_cycles, m_cycle_start_indices);
+    auto cycle_to_triangle_map =
+        triangulate<3>(m_vertices, m_segments, m_cycles, m_cycle_start_indices);
 
     // Update the cycle_is_regular vector
     map_cycle_regularity(cycle_to_triangle_map, m_cycle_is_regular);
@@ -514,7 +536,8 @@ void Contour<4>::triangulate_cycles()
     check_all_polyhedra();
 #endif
 
-    auto cycle_to_triangle_map = triangulate(m_segments, m_cycles, m_cycle_start_indices);
+    auto cycle_to_triangle_map =
+        triangulate<4>(m_vertices, m_segments, m_cycles, m_cycle_start_indices);
 
     // Update the cycle_is_regular vector
     map_cycle_regularity(cycle_to_triangle_map, m_cycle_is_regular);
@@ -563,7 +586,8 @@ void Contour<4>::triangulate_cycles()
 template <>
 Contour<3> Contour<3>::isocontour(
     std::span<Scalar> function_values,
-    std::span<Scalar> function_gradients, bool use_snapping) const
+    std::span<Scalar> function_gradients,
+    bool use_snapping) const
 {
     assert(get_num_vertices() == function_values.size());
     Contour<3> result;
@@ -588,7 +612,8 @@ Contour<3> Contour<3>::isocontour(
 template <>
 Contour<4> Contour<4>::isocontour(
     std::span<Scalar> function_values,
-    std::span<Scalar> function_gradients, bool use_snapping) const
+    std::span<Scalar> function_gradients,
+    bool use_snapping) const
 {
     assert(get_num_vertices() == function_values.size());
     Contour<4> result;
