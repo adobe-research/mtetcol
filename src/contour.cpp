@@ -317,6 +317,8 @@ std::vector<Index> compute_zero_crossing_vertices(
     constexpr Scalar snap_alpha = 0.1;
     std::vector<Index> snap_vertices(function_values.size(), invalid_index);
     std::vector<Scalar> snap_alphas(function_values.size(), 1);
+    std::vector<bool> snap_segments(num_segments, false);
+    std::vector<bool> snap_ends(num_segments, false);
 
     // Store computed vertex positions instead of adding them immediately
     std::vector<std::array<Scalar, dim>> vertex_positions;
@@ -369,6 +371,8 @@ std::vector<Index> compute_zero_crossing_vertices(
 
             // Update snapping information if needed
             if (use_snapping) {
+                snap_segments[i] = (t < snap_alpha || t > 1 - snap_alpha);
+                snap_ends[i] = (t > 1 - snap_alpha);
                 if (t < snap_alpha && t < snap_alphas[v0]) {
                     snap_vertices[v0] = static_cast<Index>(vertex_positions.size() - 1);
                     snap_alphas[v0] = t;
@@ -388,14 +392,16 @@ std::vector<Index> compute_zero_crossing_vertices(
             continue;
         }
 
-        if (use_snapping) {
+        if (use_snapping && snap_segments[i]) {
             auto seg = contour.get_segment(i);
             Index v0 = seg[0];
             Index v1 = seg[1];
-            if (snap_vertices[v0] != invalid_index) {
-                zero_crossing_vertices[i] = snap_vertices[v0];
-            } else if (snap_vertices[v1] != invalid_index) {
+            if (snap_ends[i]) {
+                assert(snap_vertices[v1] != invalid_index);
                 zero_crossing_vertices[i] = snap_vertices[v1];
+            } else {
+                assert(snap_vertices[v0] != invalid_index);
+                zero_crossing_vertices[i] = snap_vertices[v0];
             }
         }
 

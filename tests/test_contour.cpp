@@ -172,8 +172,8 @@ TEST_CASE("contour", "[mtetcol]")
 
         contour.add_vertex({0, 0, 0});
         contour.add_vertex({1, 0, 0});
-        contour.add_vertex({0, 1, 0});
         contour.add_vertex({1, 1, 0});
+        contour.add_vertex({0, 1, 0});
 
         contour.add_segment(0, 1);
         contour.add_segment(1, 2);
@@ -193,9 +193,102 @@ TEST_CASE("contour", "[mtetcol]")
         REQUIRE(contour.get_num_cycles() == 2);
 
 
-        std::vector<mtetcol::Scalar> function_values = { -1, -1, 1, 1 };
-        auto isocontour = contour.isocontour(function_values);
-        assert(isocontour.get_num_vertices() == 3);
-        assert(isocontour.get_num_segments() == 2);
+        SECTION("No snapping") {
+            std::vector<mtetcol::Scalar> function_values = { -1, -1, 1, 1 };
+            auto isocontour = contour.isocontour(function_values);
+            REQUIRE(isocontour.get_num_vertices() == 3);
+            REQUIRE(isocontour.get_num_segments() == 2);
+        }
+
+        SECTION("Snapping") {
+            std::vector<mtetcol::Scalar> function_values = { -0.0001, -0.01, 1, 1 };
+            auto isocontour = contour.isocontour(function_values, {}, true);
+            REQUIRE(isocontour.get_num_vertices() == 2);
+            REQUIRE(isocontour.get_num_segments() == 1);
+        }
+        SECTION("Snapping case 2") {
+            std::vector<mtetcol::Scalar> function_values = { 0.0001, -0.01, 1, 1 };
+            auto isocontour = contour.isocontour(function_values, {}, true);
+            REQUIRE(isocontour.get_num_vertices() == 2);
+            REQUIRE(isocontour.get_num_segments() == 1);
+        }
+        SECTION("Snapping case 3") {
+            std::vector<mtetcol::Scalar> function_values = { 1, -0.01, 1, 1 };
+            auto isocontour = contour.isocontour(function_values, {}, true);
+            REQUIRE(isocontour.get_num_vertices() == 1);
+            REQUIRE(isocontour.get_num_segments() == 0);
+        }
+    }
+
+    SECTION("3D double square")
+    {
+        mtetcol::Contour<3> contour;
+        REQUIRE(contour.get_num_vertices() == 0);
+        REQUIRE(contour.get_num_segments() == 0);
+        REQUIRE(contour.get_num_cycles() == 0);
+
+        contour.add_vertex({0, 0, 0});
+        contour.add_vertex({1, 0, 0});
+        contour.add_vertex({0, 1, 0});
+        contour.add_vertex({1, 1, 0});
+        contour.add_vertex({0, 2, 0});
+        contour.add_vertex({1, 2, 0});
+
+        contour.add_segment(0, 1); // 0
+        contour.add_segment(1, 3); // 1
+        contour.add_segment(3, 2); // 2
+        contour.add_segment(2, 0); // 3
+        contour.add_segment(3, 5); // 4
+        contour.add_segment(5, 4); // 5
+        contour.add_segment(2, 4); // 6
+
+        REQUIRE(contour.get_num_segments() == 7);
+
+        contour.add_cycle(
+            {mtetcol::signed_index(0, true),
+             mtetcol::signed_index(1, true),
+             mtetcol::signed_index(2, true),
+             mtetcol::signed_index(3, true)});
+        contour.add_cycle(
+             {mtetcol::signed_index(2, false),
+              mtetcol::signed_index(4, true),
+              mtetcol::signed_index(5, true),
+              mtetcol::signed_index(6, false)});
+        REQUIRE(contour.get_num_cycles() == 2);
+
+        SECTION("No snapping") {
+            std::vector<mtetcol::Scalar> function_values = { 1, 1, 1, -1, 1, 1 };
+            auto isocontour = contour.isocontour(function_values);
+            REQUIRE(isocontour.get_num_vertices() == 3);
+            REQUIRE(isocontour.get_num_segments() == 2);
+        }
+
+        SECTION("Snapping") {
+            std::vector<mtetcol::Scalar> function_values = { 1, 1, -0.0001, -0.001, 1, 1 };
+            auto isocontour = contour.isocontour(function_values, {}, true);
+            REQUIRE(isocontour.get_num_vertices() == 2);
+            REQUIRE(isocontour.get_num_segments() == 2);
+        }
+
+        SECTION("Snapping case 2") {
+            std::vector<mtetcol::Scalar> function_values = { 1, 1, 0.0001, -0.01, 1, 1 };
+            auto isocontour = contour.isocontour(function_values, {}, true);
+            REQUIRE(isocontour.get_num_vertices() == 2);
+            REQUIRE(isocontour.get_num_segments() == 2);
+        }
+
+        SECTION("Snapping case 3") {
+            std::vector<mtetcol::Scalar> function_values = { 1, 1, 1, -0.01, 1, 1 };
+            auto isocontour = contour.isocontour(function_values, {}, true);
+            REQUIRE(isocontour.get_num_vertices() == 1);
+            REQUIRE(isocontour.get_num_segments() == 0);
+        }
+
+        SECTION("Snapping case 4") {
+            std::vector<mtetcol::Scalar> function_values = { 1, 1, 1, -1, 1, 1000 };
+            auto isocontour = contour.isocontour(function_values, {}, true);
+            REQUIRE(isocontour.get_num_vertices() == 3);
+            REQUIRE(isocontour.get_num_segments() == 2);
+        }
     }
 }
