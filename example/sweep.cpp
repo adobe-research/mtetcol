@@ -223,7 +223,7 @@ mtetcol::Contour<4> bezier(mtetcol::SimplicialColumn<4>& columns)
     return generate_contour(columns, sweep_function);
 }
 
-mtetcol::Contour<4> blending(mtetcol::SimplicialColumn<4>& columns)
+mtetcol::Contour<4> blending_sphere_torus(mtetcol::SimplicialColumn<4>& columns)
 {
     stf::ImplicitSphere sphere(0.08, {0.0, 0.0, 0.0});
     stf::ImplicitTorus torus(0.1, 0.05, {0.0, 0.0, 0.0});
@@ -231,7 +231,11 @@ mtetcol::Contour<4> blending(mtetcol::SimplicialColumn<4>& columns)
     // stf::ImplicitSphere base_shape(0.05, {0.0, 0.0, 0.0});
     stf::SweepFunction<3> sphere_sweep(sphere, polyline);
     stf::SweepFunction<3> torus_sweep(torus, polyline);
-    stf::InterpolateFunction<3> blend(sphere_sweep, torus_sweep);
+    stf::InterpolateFunction<3> blend(
+        sphere_sweep,
+        torus_sweep,
+        [](stf::Scalar t) { return (std::sin(t * 2 * 2 * M_PI - M_PI / 2) + 1) / 2; },
+        [](stf::Scalar t) { return 2 * M_PI * std::cos(t * 2 * 2 * M_PI - M_PI / 2); });
 
     return generate_contour(columns, blend);
 }
@@ -302,29 +306,188 @@ mtetcol::Contour<4> sphere_spiral(mtetcol::SimplicialColumn<4>& columns)
 
 mtetcol::Contour<4> knot(mtetcol::SimplicialColumn<4>& columns)
 {
-    // stf::ImplicitSphere base_shape(0.025, {0.0, 0.0, 0.0});
-    stf::ImplicitCapsule<3> base_shape(0.01, {-0.1, 0.0, 0.0}, {0.1, 0, 0});
+    stf::ImplicitSphere base_shape(0.05, {0.0, 0.0, 0.0});
+    // stf::ImplicitCapsule<3> base_shape(0.01, {-0.1, 0.0, 0.0}, {0.1, 0, 0});
+    // clang-format off
     std::vector<std::array<stf::Scalar, 3>> samples{
-        {0.4000, 0.0000, 0.0000},    {0.4000, 0.0832, 0.1464},    {0.1708, 0.0915, 0.2424},
-        {0.0174, 0.0985, 0.1732},    {-0.1140, 0.1045, 0.1139},   {-0.0335, 0.1510, -0.1139},
-        {-0.0940, 0.0342, -0.1732},  {-0.1646, -0.1021, -0.2424}, {-0.2721, -0.3048, -0.1464},
-        {-0.2000, -0.3464, -0.0000}, {-0.1279, -0.3880, 0.1464},  {-0.0062, -0.1936, 0.2424},
-        {0.0766, -0.0643, 0.1732},   {0.1475, 0.0465, 0.1139},    {0.1475, -0.0465, -0.1139},
-        {0.0766, 0.0643, -0.1732},   {-0.0062, 0.1936, -0.2424},  {-0.1279, 0.3880, -0.1464},
-        {-0.2000, 0.3464, -0.0000},  {-0.2721, 0.3048, 0.1464},   {-0.1646, 0.1021, 0.2424},
-        {-0.0940, -0.0342, 0.1732},  {-0.0335, -0.1510, 0.1139},  {-0.1140, -0.1045, -0.1139},
-        {0.0174, -0.0985, -0.1732},  {0.1708, -0.0915, -0.2424},  {0.4000, -0.0832, -0.1464},
-        {0.4000, 0.0000, 0.0000},
+        { 0.7000, 0.5000, 0.5000 },
+        { 0.7000, 0.5416, 0.5732 },
+        { 0.5799, 0.5460, 0.6187 },
+        { 0.5087, 0.5493, 0.5866 },
+        { 0.4375, 0.5525, 0.5545 },
+        { 0.4858, 0.5804, 0.4455 },
+        { 0.4530, 0.5171, 0.4134 },
+        { 0.4202, 0.4538, 0.3813 },
+        { 0.3639, 0.3476, 0.4268 },
+        { 0.4000, 0.3268, 0.5000 },
+        { 0.4360, 0.3060, 0.5732 },
+        { 0.4999, 0.4078, 0.6187 },
+        { 0.5383, 0.4678, 0.5866 },
+        { 0.5767, 0.5279, 0.5545 },
+        { 0.5767, 0.4721, 0.4455 },
+        { 0.5383, 0.5322, 0.4134 },
+        { 0.4999, 0.5922, 0.3813 },
+        { 0.4360, 0.6940, 0.4268 },
+        { 0.4000, 0.6732, 0.5000 },
+        { 0.3639, 0.6524, 0.5732 },
+        { 0.4202, 0.5462, 0.6187 },
+        { 0.4530, 0.4829, 0.5866 },
+        { 0.4858, 0.4196, 0.5545 },
+        { 0.4375, 0.4475, 0.4455 },
+        { 0.5087, 0.4507, 0.4134 },
+        { 0.5799, 0.4540, 0.3813 },
+        { 0.7000, 0.4584, 0.4268 },
+        { 0.7000, 0.5000, 0.5000 },
     };
-    for (auto& p : samples) {
-        p[0] += 0.5;
-        p[1] += 0.5;
-        p[2] += 0.5;
-    }
+    // clang-format on
     auto curve = stf::PolyBezier<3>(samples);
-    //auto curve = stf::Polyline<3>(samples);
+    // auto curve = stf::Polyline<3>(samples);
     stf::SweepFunction<3> sweep_function(base_shape, curve);
 
+    return generate_contour(columns, sweep_function);
+}
+
+mtetcol::Contour<4> concentric_rings(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitSphere sphere1(0.05, {0.6, 0.5, 0.5});
+    stf::ImplicitSphere sphere2(0.05, {0.71, 0.5, 0.5});
+    stf::ImplicitUnion base_shape(sphere1, sphere2);
+
+    stf::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
+    stf::SweepFunction<3> sweep_function(base_shape, rotation);
+
+    return generate_contour(columns, sweep_function);
+}
+
+mtetcol::Contour<4> spinning_rings(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitSphere sphere1(0.05, {0.6, 0.5, 0.5});
+    stf::ImplicitSphere sphere2(0.05, {0.75, 0.5, 0.5});
+    stf::ImplicitUnion base_shape(sphere1, sphere2);
+
+    stf::Rotation<3> spin({0.675, 0.5, 0.5}, {0, 1, 0}, 360 * 3);
+    stf::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
+    stf::Compose<3> transform(rotation, spin);
+    stf::SweepFunction<3> sweep_function(base_shape, transform);
+
+    return generate_contour(columns, sweep_function);
+}
+
+mtetcol::Contour<4> spinning_rods(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitCapsule<3> rod(0.02, {0.5, 0.5, 0.5}, {0.7, 0.5, 0.5});
+
+    stf::Rotation<3> spin({0.6, 0.5, 0.5}, {0, 1, 0}, 360 * 3);
+    stf::Rotation<3> rotation({0.5, 0.5, 0.5}, {0, 0, 1});
+    stf::Compose<3> transform(rotation, spin);
+    stf::SweepFunction<3> sweep_function(rod, transform);
+
+    return generate_contour(columns, sweep_function);
+}
+
+mtetcol::Contour<4> brush_stroke(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitSphere base_shape(0.045, {0.0, 0.0, 0.0});
+
+    // clang-format off
+    std::vector<std::array<stf::Scalar, 3>> samples{
+        {0.3090, 0.6504, 0.5},
+        {0.3074, 0.6294, 0.5},
+        {0.3000, 0.5009, 0.5},
+        {0.3934, 0.4126, 0.5},
+        {0.4897, 0.3216, 0.5},
+        {0.6325, 0.3306, 0.5},
+        {0.6360, 0.3432, 0.5},
+        {0.6389, 0.3537, 0.5},
+        {0.5428, 0.3618, 0.5},
+        {0.4755, 0.4415, 0.5},
+        {0.3973, 0.5340, 0.5},
+        {0.4045, 0.6679, 0.5},
+        {0.4223, 0.6732, 0.5},
+        {0.4402, 0.6784, 0.5},
+        {0.4594, 0.5506, 0.5},
+        {0.5693, 0.4865, 0.5},
+        {0.6152, 0.4597, 0.5},
+        {0.6628, 0.4525, 0.5},
+        {0.7000, 0.4514, 0.5},
+    };
+    // clang-format on
+    stf::PolyBezier<3> transform(samples, false);
+    stf::SweepFunction<3> sweep_function(base_shape, transform);
+
+    return generate_contour(columns, sweep_function);
+}
+
+mtetcol::Contour<4> torus_double_rotation(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitTorus base_shape(0.25, 0.05, {0.5, 0.5, 0.25});
+    stf::Rotation<3> rotation({0.5, 0.5, 0.25}, {1, 0, 0});
+    stf::Translation<3> translation({0, 0, -0.5});
+    stf::Compose<3> flip(translation, rotation);
+    stf::SweepFunction<3> sweep_function(base_shape, flip);
+
+    return generate_contour(columns, sweep_function);
+}
+
+mtetcol::Contour<4> rotating_rods(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitCapsule<3> rod1(0.02, {-0.1, 0.0, 0.0}, {0.1, 0.0, 0.0});
+    stf::ImplicitCapsule<3> rod2(0.02, {0.0, -0.1, 0.0}, {0.0, 0.1, 0.0});
+    stf::Rotation<3> rotation1({0.0, 0.0, 0.0}, {0, 0, 1});
+    stf::Rotation<3> rotation2({0.0, 0.0, 0.0}, {0, 0, -1});
+    stf::Polyline<3> polyline({{0.25, 0.5, 0.5}, {0.75, 0.5, 0.5}});
+    stf::Compose<3> transform1(polyline, rotation1);
+    stf::Compose<3> transform2(polyline, rotation2);
+
+    stf::SweepFunction<3> sweep_function1(rod1, transform1);
+    stf::SweepFunction<3> sweep_function2(rod2, transform2);
+    stf::UnionFunction<3> union_sweeps(sweep_function1, sweep_function2, 0.01);
+
+    return generate_contour(columns, union_sweeps);
+}
+
+mtetcol::Contour<4> blending_spheres_nonlinear(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitSphere sphere(0.07, {0.0, 0.0, 0.0}, 2);
+    stf::ImplicitSphere sphere2(0.07, {0.0, 0.1, 0.0}, 2);
+    stf::ImplicitSphere sphere3(0.07, {0.0, -0.1, 0.0}, 2);
+    stf::ImplicitUnion two_spheres(sphere2, sphere3, 0.004);
+
+    stf::Polyline<3> polyline({{0.2, 0.5, 0.5}, {0.8, 0.5, 0.5}});
+    stf::SweepFunction<3> sphere_sweep(sphere, polyline);
+    stf::SweepFunction<3> two_sphere_sweep(two_spheres, polyline);
+    stf::InterpolateFunction<3> blend(
+        sphere_sweep,
+        two_sphere_sweep,
+        [](stf::Scalar t) { return (std::sin(t * 2 * 2 * M_PI - M_PI / 2) + 1) / 2; },
+        [](stf::Scalar t) { return 2 * M_PI * std::cos(t * 2 * 2 * M_PI - M_PI / 2); });
+
+    return generate_contour(columns, blend);
+}
+
+mtetcol::Contour<4> letter_L(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitSphere sphere(0.02, {0.0, 0.0, 0.0});
+    stf::PolyBezier<3> curve(
+        {
+            {0.6941, 0.4189, 0.5}, {0.6457, 0.3864, 0.5}, {0.5952, 0.3504, 0.5},
+            {0.5448, 0.3504, 0.5}, {0.5076, 0.3504, 0.5}, {0.4752, 0.3696, 0.49},
+            {0.4447, 0.3899, 0.48}, {0.4110, 0.4126, 0.49}, {0.3755, 0.4392, 0.5},
+            {0.3422, 0.4392, 0.5}, {0.3180, 0.4392, 0.5}, {0.3000, 0.4204, 0.5},
+            {0.3000, 0.3993, 0.5}, {0.3000, 0.3782, 0.5}, {0.3192, 0.3555, 0.5},
+            {0.3567, 0.3555, 0.5}, {0.3893, 0.3555, 0.5}, {0.4193, 0.3729, 0.5},
+            {0.4439, 0.3966, 0.5}, {0.4670, 0.4196, 0.5}, {0.5081, 0.4804, 0.5},
+            {0.5323, 0.5170, 0.5}, {0.5946, 0.6112, 0.5}, {0.6257, 0.6496, 0.5},
+            {0.6683, 0.6496, 0.5}, {0.6855, 0.6496, 0.5}, {0.7000, 0.6363, 0.5},
+            {0.7000, 0.6159, 0.5}, {0.7000, 0.5741, 0.5}, {0.6157, 0.4908, 0.49},
+            {0.5025, 0.4873, 0.48}, {0.4029, 0.4842, 0.49}, {0.3395, 0.5440, 0.5},
+            {0.3395, 0.5933, 0.5}, {0.3395, 0.6245, 0.5}, {0.3649, 0.6488, 0.5},
+            {0.4017, 0.6488, 0.5}, {0.4498, 0.6488, 0.5}, {0.4799, 0.6022, 0.5},
+            {0.4799, 0.6022, 0.5},
+        },
+        false);
+
+    stf::SweepFunction<3> sweep_function(sphere, curve);
     return generate_contour(columns, sweep_function);
 }
 
@@ -352,11 +515,19 @@ int main(int argc, char** argv)
     // auto isocontour = torus_flip(columns);
     // auto isocontour = elbow(columns);
     // auto isocontour = bezier(columns);
-    // auto isocontour = blending(columns);
+    // auto isocontour = blending_sphere_torus(columns);
     // auto isocontour = blending_spheres(columns);
+    // auto isocontour = blending_spheres_nonlinear(columns);
     // auto isocontour = sphere_spiral(columns);
     // auto isocontour = union_of_sweeps(columns);
-    auto isocontour = knot(columns);
+    // auto isocontour = knot(columns);
+    // auto isocontour = spinning_rings(columns);
+    // auto isocontour = concentric_rings(columns);
+    // auto isocontour = brush_stroke(columns);
+    // auto isocontour = torus_double_rotation(columns);
+    // auto isocontour = rotating_rods(columns);
+    // auto isocontour = spinning_rods(columns);
+    auto isocontour = letter_L(columns);
 
     isocontour.triangulate_cycles();
     mtetcol::save_contour("contour.msh", isocontour);
