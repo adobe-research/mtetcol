@@ -61,6 +61,16 @@ if (MTETCOL_BUILD_EXAMPLE)
         stf::stf
     )
     target_compile_features(sweep2d PRIVATE cxx_std_20)
+
+    add_executable(implicit_contour ${CMAKE_CURRENT_LIST_DIR}/example/implicit_contour.cpp)
+    target_link_libraries(implicit_contour
+        PRIVATE
+        mtetcol::mtetcol
+        spdlog::spdlog
+        stf::stf
+        mtet::mtet
+    )
+    target_compile_features(implicit_contour PRIVATE cxx_std_20)
 endif()
 
 if(MTETCOL_BUILD_TESTS)

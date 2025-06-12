@@ -470,24 +470,84 @@ mtetcol::Contour<4> letter_L(mtetcol::SimplicialColumn<4>& columns)
     stf::ImplicitSphere sphere(0.02, {0.0, 0.0, 0.0});
     stf::PolyBezier<3> curve(
         {
-            {0.6941, 0.4189, 0.5}, {0.6457, 0.3864, 0.5}, {0.5952, 0.3504, 0.5},
-            {0.5448, 0.3504, 0.5}, {0.5076, 0.3504, 0.5}, {0.4752, 0.3696, 0.49},
-            {0.4447, 0.3899, 0.48}, {0.4110, 0.4126, 0.49}, {0.3755, 0.4392, 0.5},
-            {0.3422, 0.4392, 0.5}, {0.3180, 0.4392, 0.5}, {0.3000, 0.4204, 0.5},
-            {0.3000, 0.3993, 0.5}, {0.3000, 0.3782, 0.5}, {0.3192, 0.3555, 0.5},
-            {0.3567, 0.3555, 0.5}, {0.3893, 0.3555, 0.5}, {0.4193, 0.3729, 0.5},
-            {0.4439, 0.3966, 0.5}, {0.4670, 0.4196, 0.5}, {0.5081, 0.4804, 0.5},
-            {0.5323, 0.5170, 0.5}, {0.5946, 0.6112, 0.5}, {0.6257, 0.6496, 0.5},
-            {0.6683, 0.6496, 0.5}, {0.6855, 0.6496, 0.5}, {0.7000, 0.6363, 0.5},
-            {0.7000, 0.6159, 0.5}, {0.7000, 0.5741, 0.5}, {0.6157, 0.4908, 0.49},
-            {0.5025, 0.4873, 0.48}, {0.4029, 0.4842, 0.49}, {0.3395, 0.5440, 0.5},
-            {0.3395, 0.5933, 0.5}, {0.3395, 0.6245, 0.5}, {0.3649, 0.6488, 0.5},
-            {0.4017, 0.6488, 0.5}, {0.4498, 0.6488, 0.5}, {0.4799, 0.6022, 0.5},
-            {0.4799, 0.6022, 0.5},
+            {0.6941, 0.4189, 0.45},
+            {0.6457, 0.3864, 0.4532520646014161},
+            {0.5952, 0.3504, 0.4567053138602828},
+            {0.5448, 0.3504, 0.45951681021477053},
+            {0.5076, 0.3504, 0.461587292026215},
+            {0.4752, 0.3696, 0.46368795156949405},
+            {0.4447, 0.3899, 0.46573106669305236},
+            {0.4110, 0.4126, 0.4679918240358986},
+            {0.3755, 0.4392, 0.4704676882285434},
+            {0.3422, 0.4392, 0.47232022458615164},
+            {0.3180, 0.4392, 0.47367148639993645},
+            {0.3000, 0.4204, 0.4751204549163221},
+            {0.3000, 0.3993, 0.4762973603670379},
+            {0.3000, 0.3782, 0.4774742658177537},
+            {0.3192, 0.3555, 0.4791290732784213},
+            {0.3567, 0.3555, 0.4812213496352494},
+            {0.3893, 0.3555, 0.48304119417478214},
+            {0.4193, 0.3729, 0.48497004222424356},
+            {0.4439, 0.3966, 0.48687369938850344},
+            {0.4670, 0.4196, 0.48869220574687294},
+            {0.5081, 0.4804, 0.49278055529388515},
+            {0.5323, 0.5170, 0.49522667680735677},
+            {0.5946, 0.6112, 0.5015202760795618},
+            {0.6257, 0.6496, 0.5042756679944657},
+            {0.6683, 0.6496, 0.5066512734412809},
+            {0.6855, 0.6496, 0.5076102334381605},
+            {0.7000, 0.6363, 0.508705395789782},
+            {0.7000, 0.6159, 0.5098387121497305},
+            {0.7000, 0.5741, 0.5121707285057785},
+            {0.6157, 0.4908, 0.5187744847481601},
+            {0.5025, 0.4873, 0.5250870538782416},
+            {0.4029, 0.4842, 0.5306437666433996},
+            {0.3395, 0.5440, 0.5355028764354673},
+            {0.3395, 0.5933, 0.5382489891538043},
+            {0.3395, 0.6245, 0.5399925527844943},
+            {0.3649, 0.6488, 0.541950304765777},
+            {0.4017, 0.6488, 0.5439989920318379},
+            {0.4498, 0.6488, 0.5466797211140239},
+            {0.4799, 0.6022, 0.5497688624782774},
+            {0.4834, 0.6002, 0.55},
         },
         false);
 
     stf::SweepFunction<3> sweep_function(sphere, curve);
+    return generate_contour(columns, sweep_function);
+}
+
+mtetcol::Contour<4> loopDloop_with_offset(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitTorus base_shape(0.07, 0.03, {0.0, 0.0, 0.0});
+    // stf::ImplicitSphere base_shape(0.05, {0.0, 0.0, 0.0});
+    stf::PolyBezier<3> bezier(
+        {{0.2, 0.2, 0.3}, {1.4, 0.8, 0.3}, {-0.4, 0.8, 0.3}, {0.8, 0.2, 0.3}});
+    stf::SweepFunction<3> sweep_function(base_shape, bezier);
+    stf::OffsetFunction<3> offset_function(
+        sweep_function,
+        [](stf::Scalar t) { return -0.02 * std::cos(t * 2 * M_PI) - 0.02; },
+        [](stf::Scalar t) { return 0.02 * std::sin(t * 2 * M_PI) * 2 * M_PI; });
+
+    return generate_contour(columns, offset_function);
+}
+
+mtetcol::Contour<4> doghead(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::Duchon base_shape(
+            "vipss_data/doghead_800_shifted.xyz",
+            "vipss_data/doghead_800_shifted_coeff",
+            {0.0, 0.0, 0.0},
+            0.2, true);
+    stf::Translation<3> translation({-0.5, 0.0, 0.0});
+    stf::Rotation<3> rotation_Y({0.5, 0.5, 0.5}, {0.0, 1.0, 0.0}, 180);
+    stf::Rotation<3> rotation_X({0.25, 0.5, 0.5}, {1.0, 0.0, 0.0}, 360);
+    stf::Rotation<3> rotation_Z({0.5, 0.5, 0.5}, {0.0, 0.0, 1.0}, 180);
+    stf::Compose<3> transform(translation, rotation_Y);
+    stf::PolyBezier<3> bezier(
+        {{0.2, 0.2, 0.3}, {1.4, 0.8, 0.4}, {-0.4, 0.8, 0.5}, {0.8, 0.2, 0.6}});
+    stf::SweepFunction<3> sweep_function(base_shape, bezier);
+
     return generate_contour(columns, sweep_function);
 }
 
@@ -496,7 +556,7 @@ int main(int argc, char** argv)
 {
     mtetcol::logger().set_level(spdlog::level::debug);
 
-    constexpr size_t resolution = 128;
+    constexpr size_t resolution = 64;
     auto tet_mesh = mtet::generate_tet_grid(
         {resolution, resolution, resolution},
         {0, 0, 0},
@@ -527,7 +587,9 @@ int main(int argc, char** argv)
     // auto isocontour = torus_double_rotation(columns);
     // auto isocontour = rotating_rods(columns);
     // auto isocontour = spinning_rods(columns);
-    auto isocontour = letter_L(columns);
+    // auto isocontour = letter_L(columns);
+    // auto isocontour = loopDloop_with_offset(columns);
+    auto isocontour = doghead(columns);
 
     isocontour.triangulate_cycles();
     mtetcol::save_contour("contour.msh", isocontour);
