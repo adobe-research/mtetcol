@@ -11,6 +11,18 @@ namespace mtetcol {
 using Edge = std::array<Index, 2>; // [v0, v1]
 using Triangle = std::array<Index, 3>; // [v0, v1, v2]
 
+struct SignedIndexHash
+{
+    using is_transparent = void;
+    using is_avalanching = void;
+
+    [[nodiscard]] inline auto operator()(const SignedIndex& si) const noexcept -> uint64_t
+    {
+        ankerl::unordered_dense::hash<int32_t> hash_fn;
+        return hash_fn(value_of(si));
+    }
+};
+
 struct EdgeHash
 {
     using is_transparent = void;

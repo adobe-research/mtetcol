@@ -1,5 +1,6 @@
 #include <mtetcol/contour.h>
 #include <mtetcol/disjoint_cycles.h>
+#include <mtetcol/nondisjoint_cycles.h>
 
 #include "hashmap.h"
 
@@ -648,9 +649,9 @@ Contour<4> Contour<4>::isocontour(
         compute_zero_crossing_segments(*this, function_values, zero_crossing_vertices, result);
 
     size_t num_polyhedra = get_num_polyhedra();
-    DisjointCycles disjoint_cycles(result.get_num_vertices(), result.m_segments);
+    NonDisjointCycles cycles(result.m_segments);
     for (size_t i = 0; i < num_polyhedra; i++) {
-        disjoint_cycles.clear();
+        cycles.clear();
         auto polyhedron = get_polyhedron(i);
         for (auto cid : polyhedron) {
             Index seg_start = zero_crossing_segment_indices[index(cid)];
@@ -658,11 +659,11 @@ Contour<4> Contour<4>::isocontour(
             bool cycle_ori = orientation(cid);
 
             for (Index seg_id = seg_start; seg_id < seg_end; seg_id++) {
-                disjoint_cycles.register_segment(signed_index(seg_id, cycle_ori));
+                cycles.register_segment(signed_index(seg_id, cycle_ori));
             }
         }
         size_t num_existing_cycles = result.m_cycle_start_indices.size();
-        disjoint_cycles.extract_cycles(result.m_cycles, result.m_cycle_start_indices);
+        cycles.extract_cycles(result.m_cycles, result.m_cycle_start_indices);
 
         for (size_t j = num_existing_cycles; j < result.m_cycle_start_indices.size(); j++) {
             result.m_cycle_is_regular.push_back(m_polyhedron_is_regular[i]);

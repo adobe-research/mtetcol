@@ -465,9 +465,8 @@ mtetcol::Contour<4> blending_spheres_nonlinear(mtetcol::SimplicialColumn<4>& col
     return generate_contour(columns, blend);
 }
 
-mtetcol::Contour<4> letter_L(mtetcol::SimplicialColumn<4>& columns)
+stf::PolyBezier<3> letter_L_curve(bool use_frame = false)
 {
-    stf::ImplicitSphere sphere(0.02, {0.0, 0.0, 0.0});
     stf::PolyBezier<3> curve(
         {
             {0.6941, 0.4189, 0.45},
@@ -511,9 +510,32 @@ mtetcol::Contour<4> letter_L(mtetcol::SimplicialColumn<4>& columns)
             {0.4799, 0.6022, 0.5497688624782774},
             {0.4834, 0.6002, 0.55},
         },
-        false);
+        use_frame);
+    return curve;
+}
+
+mtetcol::Contour<4> letter_L(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitSphere sphere(0.02, {0.0, 0.0, 0.0});
+    stf::PolyBezier<3> curve = letter_L_curve();
 
     stf::SweepFunction<3> sweep_function(sphere, curve);
+    return generate_contour(columns, sweep_function);
+}
+
+mtetcol::Contour<4> letter_L_blend(mtetcol::SimplicialColumn<4>& columns)
+{
+    static stf::ImplicitTorus torus(0.03, 0.015, {0.0, 0.0, 0.0});
+    stf::PolyBezier<3> curve = letter_L_curve();
+
+    stf::Rotation<3> torus_rotation({0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, 360 * 3);
+    stf::Compose<3> torus_curve(curve, torus_rotation);
+    stf::SweepFunction<3> torus_sweep(torus, torus_curve);
+    stf::OffsetFunction<3> sweep_function(
+        torus_sweep,
+        [](stf::Scalar t) { return - 0.01 * std::sin(t * 6 * M_PI) - 0.01; },
+        [](stf::Scalar t) { return - 0.01 * std::cos(t * 6 * M_PI) * 6 * M_PI; });
+
     return generate_contour(columns, sweep_function);
 }
 
@@ -535,10 +557,11 @@ mtetcol::Contour<4> loopDloop_with_offset(mtetcol::SimplicialColumn<4>& columns)
 mtetcol::Contour<4> doghead(mtetcol::SimplicialColumn<4>& columns)
 {
     stf::Duchon base_shape(
-            "vipss_data/doghead_800_shifted.xyz",
-            "vipss_data/doghead_800_shifted_coeff",
-            {0.0, 0.0, 0.0},
-            0.2, true);
+        "vipss_data/doghead_800_shifted.xyz",
+        "vipss_data/doghead_800_shifted_coeff",
+        {0.0, 0.0, 0.0},
+        0.2,
+        true);
     stf::Translation<3> translation({-0.5, 0.0, 0.0});
     stf::Rotation<3> rotation_Y({0.5, 0.5, 0.5}, {0.0, 1.0, 0.0}, 180);
     stf::Rotation<3> rotation_X({0.25, 0.5, 0.5}, {1.0, 0.0, 0.0}, 360);
@@ -589,7 +612,8 @@ int main(int argc, char** argv)
     // auto isocontour = spinning_rods(columns);
     // auto isocontour = letter_L(columns);
     // auto isocontour = loopDloop_with_offset(columns);
-    auto isocontour = doghead(columns);
+    // auto isocontour = doghead(columns);
+    auto isocontour = letter_L_blend(columns);
 
     isocontour.triangulate_cycles();
     mtetcol::save_contour("contour.msh", isocontour);
