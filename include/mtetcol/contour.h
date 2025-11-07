@@ -1,8 +1,10 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <exception>
+#include <functional>
 #include <iterator>
 #include <numeric>
 #include <span>
@@ -11,6 +13,8 @@
 
 #include <mtetcol/common.h>
 #include <mtetcol/logger.h>
+
+#include <SmallVector.h>
 
 namespace mtetcol {
 
@@ -64,8 +68,34 @@ public:
      */
     std::span<const Scalar, dim> get_vertex(Index vid) const
     {
+        if (vid * dim + dim - 1 >= m_vertices.size()) {
+            throw std::out_of_range("Vertex ID out of range");
+        }
         return std::span<const Scalar, dim>(m_vertices.data() + vid * dim, dim);
     }
+
+    /**
+     * @brief Retrieves a mutable reference to the coordinates of a vertex
+     *
+     * @param vid The index of the vertex to retrieve
+     *
+     * @return std::span<Scalar, dim> A span containing the coordinates of the vertex (size depends
+     * on dim)
+     */
+    std::span<Scalar, dim> ref_vertex(Index vid)
+    {
+        if (vid * dim + dim - 1 >= m_vertices.size()) {
+            throw std::out_of_range("Vertex ID out of range");
+        }
+        return std::span<Scalar, dim>(m_vertices.data() + vid * dim, dim);
+    }
+
+    /**
+     * @brief Resizes the vertex list to accommodate a specified number of vertices
+     *
+     * @param num_vertices The number of vertices to allocate space for
+     */
+    void resize_vertices(size_t num_vertices) { m_vertices.resize(num_vertices * dim); }
 
     /**
      * @brief Retrieves the number of vertices in the contour
@@ -95,6 +125,9 @@ public:
      */
     std::span<const Index, 2> get_segment(Index segid) const
     {
+        if (segid * 2 + 1 >= m_segments.size()) {
+            throw std::out_of_range("Segment ID out of range");
+        }
         return std::span<const Index, 2>(m_segments.data() + segid * 2, 2);
     }
 
@@ -118,7 +151,8 @@ public:
     {
         std::copy(cycle.begin(), cycle.end(), std::back_inserter(m_cycles));
         m_cycle_start_indices.push_back(m_cycles.size());
-        assert(check_cycle(get_num_cycles() - 1));
+        assert(cycle_is_valid(get_num_cycles() - 1));
+        assert(cycle_is_simple(get_num_cycles() - 1));
         m_cycle_is_regular.push_back(is_regular);
     }
 
@@ -135,7 +169,8 @@ public:
     {
         std::copy(cycle.begin(), cycle.end(), std::back_inserter(m_cycles));
         m_cycle_start_indices.push_back(m_cycles.size());
-        assert(check_cycle(get_num_cycles() - 1));
+        assert(cycle_is_valid(get_num_cycles() - 1));
+        assert(cycle_is_simple(get_num_cycles() - 1));
         m_cycle_is_regular.push_back(is_regular);
     }
 
@@ -180,10 +215,7 @@ public:
      *
      * @return std::vector<bool> A vector indicating whether each cycle is regular
      */
-    const std::vector<bool>& get_cycle_is_regular() const
-    {
-        return m_cycle_is_regular;
-    }
+    const std::vector<bool>& get_cycle_is_regular() const { return m_cycle_is_regular; }
 
     /**
      * @brief Retrieves the number of cycles in the contour
@@ -268,10 +300,7 @@ public:
      *
      * @return std::vector<bool> A vector indicating whether each polyhedron is regular
      */
-    const std::vector<bool>& get_polyhedron_is_regular() const
-    {
-        return m_polyhedron_is_regular;
-    }
+    const std::vector<bool>& get_polyhedron_is_regular() const { return m_polyhedron_is_regular; }
 
     /**
      * @brief Retrieves the number of polyhedra in the contour
@@ -296,7 +325,8 @@ public:
      * @brief Compute the isocontour of this contour.
      *
      * @param function_values A span of function values at the vertices of the contour.
-     * @param function_gradients (optional) A span of function gradients at the vertices of the contour.
+     * @param function_gradients (optional) A span of function gradients at the vertices of the
+     * contour.
      * @param use_snapping (optional) A boolean flag indicating whether to use snapping.
      *
      * @return A Contour object representing the isocontour.
@@ -307,7 +337,8 @@ public:
         bool use_snapping = false) const;
 
 private:
-    void check_all_segments() const {
+    void check_all_segments() const
+    {
         const size_t num_vertices = get_num_vertices();
         for (auto vi : m_segments) {
             assert(vi >= 0 && vi < num_vertices);
@@ -323,7 +354,7 @@ private:
      * @param cid The index of the cycle to check.
      * @return True if the cycle is valid, false otherwise.
      */
-    bool check_cycle(Index cid) const
+    bool cycle_is_valid(Index cid) const
     {
         auto cycle = get_cycle(cid);
         size_t cycle_size = cycle.size();
@@ -349,25 +380,37 @@ private:
     }
 
     /**
+     * @brief Check if the cycle is simple.
+     *
+     * A cycle is simple if it does not self-interesect. I.e. there should not be any duplicate
+     * vertices in the cycle.
+     *
+     * @param cid The index of the cycle to check.
+     * @return True if the cycle is simple, false otherwise.
+     */
+    bool cycle_is_simple(Index cid) const;
+
+    /**
      * @brief Check all cycles in the contour for validity.
      *
-     * This method iterates through all cycles and calls check_cycle() on each one.
+     * This method iterates through all cycles and ensures cycle is valid and simple.
      * It is used for debugging purposes to ensure the contour's integrity.
      */
     void check_all_cycles() const
     {
         size_t num_cycles = get_num_cycles();
         assert(num_cycles == m_cycle_is_regular.size());
-        for (size_t ci=0; ci < num_cycles; ci++) {
-            check_cycle(ci);
+        for (size_t ci = 0; ci < num_cycles; ci++) {
+            assert(cycle_is_valid(ci));
+            assert(cycle_is_simple(ci));
         }
     }
 
     /**
      * @brief Check if the polyhedron is valid.
      *
-     * A polyhedron is valid if the sum of signed segment indices of all cycles in the polyhedron is zero.
-     * This ensures the polyhedron forms a closed surface.
+     * A polyhedron is valid if the sum of signed segment indices of all cycles in the polyhedron is
+     * zero. This ensures the polyhedron forms a closed surface.
      *
      * @param poly_id The index of the polyhedron to check.
      * @return True if the polyhedron is valid, false otherwise.
@@ -407,7 +450,7 @@ private:
     {
         size_t num_polyhedra = get_num_polyhedra();
         assert(num_polyhedra == m_polyhedron_is_regular.size());
-        for (size_t pi=0; pi < num_polyhedra; pi++) {
+        for (size_t pi = 0; pi < num_polyhedra; pi++) {
             check_polyhedron(pi);
         }
     }
@@ -446,5 +489,26 @@ private:
     std::vector<Index> m_polyhedron_start_indices = {0};
     std::vector<bool> m_polyhedron_is_regular;
 };
+
+/**
+ * @brief Extract simple loops from a cycle that may contain duplicate vertices.
+ *
+ * This function takes a cycle (represented as a sequence of signed segment indices) and
+ * splits it into multiple simple loops if the cycle contains duplicate vertices (junction points).
+ * Each junction vertex (appearing more than once in the cycle) acts as a splitting point.
+ *
+ * @param cycle A span of signed indices representing the cycle segments
+ * @param get_segment A callback function that takes a segment index and returns the two vertex
+ *                    indices of that segment as std::array<Index, 2>
+ * @return A SmallVector of SmallVectors, where each inner SmallVector represents a simple loop
+ *         (subcycle) extracted from the input cycle. If the input cycle has no duplicate vertices,
+ *         returns a single-element vector containing the original cycle.
+ *
+ * @note The extraction algorithm prioritizes starting from junction vertices (valence > 1) to
+ *       ensure proper splitting of cycles at duplicate vertices.
+ */
+llvm_vecsmall::SmallVector<llvm_vecsmall::SmallVector<SignedIndex, 16>, 4> extract_simple_loops(
+    std::span<const SignedIndex> cycle,
+    std::function<std::array<Index, 2>(Index)> get_segment);
 
 } // namespace mtetcol

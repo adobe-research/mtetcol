@@ -574,6 +574,15 @@ mtetcol::Contour<4> doghead(mtetcol::SimplicialColumn<4>& columns)
     return generate_contour(columns, sweep_function);
 }
 
+mtetcol::Contour<4> rotating_rod(mtetcol::SimplicialColumn<4>& columns)
+{
+    stf::ImplicitCapsule<3> rod(0.1, {0.5, 0.5, 0.5}, {0.85, 0.5, 0.5});
+    stf::Rotation<3> rotation({0.5, 0.5, 0.5}, {0.0, 0.0, 1.0}, 180);
+    stf::SweepFunction<3> sweep_function(rod, rotation);
+
+    return generate_contour(columns, sweep_function);
+}
+
 
 int main(int argc, char** argv)
 {
@@ -613,7 +622,8 @@ int main(int argc, char** argv)
     // auto isocontour = letter_L(columns);
     // auto isocontour = loopDloop_with_offset(columns);
     // auto isocontour = doghead(columns);
-    auto isocontour = letter_L_blend(columns);
+    // auto isocontour = letter_L_blend(columns);
+    auto isocontour = rotating_rod(columns);
 
     isocontour.triangulate_cycles();
     mtetcol::save_contour("contour.msh", isocontour);

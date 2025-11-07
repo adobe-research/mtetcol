@@ -5,8 +5,279 @@
 #include "hashmap.h"
 
 #include <SmallVector.h>
+#include <ankerl/unordered_dense.h>
 
 namespace mtetcol {
+
+template <int dim>
+bool Contour<dim>::cycle_is_simple(Index cid) const {
+    auto cycle = this->get_cycle(cid);
+    size_t cycle_size = cycle.size();
+
+    ankerl::unordered_dense::map<Index, Index> vertex_count;
+
+    for (size_t i = 0; i < cycle_size; i++) {
+        auto seg = get_segment(index(cycle[i]));
+
+        vertex_count[seg[0]]++;
+        vertex_count[seg[1]]++;
+    }
+
+    for (auto [v, count] : vertex_count) {
+        if (count != 2) {
+            return false;
+        }
+    }
+    return true;
+}
+
+llvm_vecsmall::SmallVector<llvm_vecsmall::SmallVector<SignedIndex, 16>, 4> extract_simple_loops(
+    std::span<const SignedIndex> cycle,
+    std::function<std::array<Index, 2>(Index)> get_segment)
+{
+    using SmallVector = llvm_vecsmall::SmallVector<SignedIndex, 16>;
+    using SubcycleList = llvm_vecsmall::SmallVector<SmallVector, 4>;
+
+    if (cycle.empty()) {
+        return {};
+    }
+
+    // Step 1: Identify and remove canceling segment pairs
+    // Segments that connect the same two vertices in opposite directions cancel each other out
+    // Build a map of directed edges: (v0, v1) -> list of segment indices
+    ankerl::unordered_dense::map<std::pair<Index, Index>, SmallVector> edge_map;
+    for (auto sid : cycle) {
+        Index seg_idx = index(sid);
+        bool seg_ori = orientation(sid);
+        auto seg = get_segment(seg_idx);
+        Index v0 = seg[seg_ori ? 0 : 1];  // start vertex
+        Index v1 = seg[seg_ori ? 1 : 0];  // end vertex
+        edge_map[{v0, v1}].push_back(sid);
+    }
+
+    // Find canceling pairs and mark segments to skip
+    // Only segments connecting the same vertices in OPPOSITE directions cancel each other
+    ankerl::unordered_dense::set<Index> canceled_segments;
+    ankerl::unordered_dense::set<std::pair<Index, Index>> processed_edges;
+    
+    for (const auto& [edge, sids] : edge_map) {
+        auto [v0, v1] = edge;
+        
+        // Skip if we already processed this edge pair
+        if (processed_edges.count({v0, v1}) > 0 || processed_edges.count({v1, v0}) > 0) {
+            continue;
+        }
+        processed_edges.insert({v0, v1});
+        
+        size_t forward_count = sids.size();
+        size_t reverse_count = 0;
+        SmallVector reverse_sids;
+        
+        // Check if reverse edge exists
+        auto reverse_edge = std::make_pair(v1, v0);
+        if (edge_map.count(reverse_edge) > 0) {
+            reverse_sids = edge_map[reverse_edge];
+            reverse_count = reverse_sids.size();
+        }
+        
+        // Match and cancel pairs going in opposite directions
+        size_t cancel_count = std::min(forward_count, reverse_count);
+        for (size_t i = 0; i < cancel_count; i++) {
+            canceled_segments.insert(index(sids[i]));
+            canceled_segments.insert(index(reverse_sids[i]));
+        }
+    }
+
+    // Step 2: Build adjacency list for graph traversal using only non-canceled segments
+    // adj[v] contains all segments starting from vertex v
+    // The size of adj[v] gives the valence of vertex v
+    ankerl::unordered_dense::map<Index, SmallVector> adj;
+    for (auto sid : cycle) {
+        Index seg_idx = index(sid);
+        
+        // Skip canceled segments
+        if (canceled_segments.count(seg_idx) > 0) {
+            continue;
+        }
+        
+        bool seg_ori = orientation(sid);
+        auto seg = get_segment(seg_idx);
+        Index v0 = seg[seg_ori ? 0 : 1];
+        adj[v0].push_back(sid);
+    }
+
+    // Check if any vertex has valence > 1 (i.e., is a junction point)
+    bool has_junction = false;
+    for (const auto& [v, segments] : adj) {
+        if (segments.size() > 1) {
+            has_junction = true;
+            break;
+        }
+    }
+
+    // If no junction vertices exist, we need to extract connected components
+    // The remaining segments might form multiple disconnected simple loops
+    if (!has_junction) {
+        // Extract all connected components
+        SubcycleList subcycles;
+        ankerl::unordered_dense::set<Index> used_segments;
+        
+        for (auto sid : cycle) {
+            Index seg_idx = index(sid);
+            
+            // Skip if canceled or already used
+            if (canceled_segments.count(seg_idx) > 0 || used_segments.count(seg_idx) > 0) {
+                continue;
+            }
+            
+            // Extract one connected component starting from this segment
+            SmallVector component;
+            Index start_seg_idx = seg_idx;
+            SignedIndex current_sid = sid;
+            
+            while (true) {
+                Index curr_seg_idx = index(current_sid);
+                
+                // Check if we've already processed this segment
+                if (used_segments.count(curr_seg_idx) > 0) {
+                    break;
+                }
+                
+                component.push_back(current_sid);
+                used_segments.insert(curr_seg_idx);
+                
+                // Find the next segment in this component
+                bool curr_ori = orientation(current_sid);
+                auto curr_seg = get_segment(curr_seg_idx);
+                Index next_vertex = curr_seg[curr_ori ? 1 : 0];  // End vertex of current segment
+                
+                // Look for a segment starting from next_vertex
+                SignedIndex next_sid = current_sid;  // Initialize to current (will break if not found)
+                bool found_next = false;
+                
+                if (adj.count(next_vertex) > 0) {
+                    for (auto candidate_sid : adj[next_vertex]) {
+                        Index candidate_idx = index(candidate_sid);
+                        if (used_segments.count(candidate_idx) == 0) {
+                            next_sid = candidate_sid;
+                            found_next = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!found_next) {
+                    // No more segments in this component
+                    break;
+                }
+                
+                current_sid = next_sid;
+            }
+            
+            // Only add components with at least 3 segments
+            if (component.size() >= 3) {
+                subcycles.push_back(component);
+            }
+        }
+        
+        return subcycles;
+    }
+
+    // Track used segments by their segment index (initialized with canceled segments)
+    ankerl::unordered_dense::set<Index> used = canceled_segments;
+
+    // Helper lambda to extract a subcycle starting from a given segment
+    auto extract_one_subcycle = [&](SignedIndex sid) -> SmallVector {
+        Index seg_idx = index(sid);
+        bool seg_ori = orientation(sid);
+        auto seg = get_segment(seg_idx);
+        Index start_vertex = seg[seg_ori ? 0 : 1];
+        Index current_vertex = seg[seg_ori ? 1 : 0];
+
+        SmallVector subcycle;
+        subcycle.push_back(sid);
+        used.insert(seg_idx);
+
+        // Follow the chain until we return to start or reach a dead end
+        while (current_vertex != start_vertex) {
+            bool found_next = false;
+            if (adj.count(current_vertex) > 0) {
+                for (auto next_sid : adj[current_vertex]) {
+                    Index next_seg_idx = index(next_sid);
+
+                    // Skip if this segment has already been used
+                    if (used.count(next_seg_idx) > 0) {
+                        continue;
+                    }
+
+                    bool next_seg_ori = orientation(next_sid);
+                    auto next_seg = get_segment(next_seg_idx);
+                    Index next_v0 = next_seg[next_seg_ori ? 0 : 1];
+
+                    if (next_v0 == current_vertex) {
+                        subcycle.push_back(next_sid);
+                        used.insert(next_seg_idx);
+                        current_vertex = next_seg[next_seg_ori ? 1 : 0];
+                        found_next = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!found_next) {
+                // Dead end - this shouldn't happen in a valid cycle
+                break;
+            }
+        }
+
+        return subcycle;
+    };
+
+    // Extract subcycles by starting from segments whose starting vertex has valence > 1
+    // (junction points) This ensures we properly split cycles at duplicate vertices
+    SubcycleList subcycles;
+
+    for (auto sid : cycle) {
+        Index seg_idx = index(sid);
+
+        if (used.count(seg_idx) > 0) {
+            continue;
+        }
+
+        bool seg_ori = orientation(sid);
+        auto seg = get_segment(seg_idx);
+        Index start_vertex = seg[seg_ori ? 0 : 1];
+
+        // Only process segments starting from junction vertices (valence > 1)
+        if (adj[start_vertex].size() <= 1) {
+            continue;
+        }
+
+        auto subcycle = extract_one_subcycle(sid);
+
+        // Only add subcycle if it forms a valid closed loop (at least 3 segments and actually closes)
+        if (subcycle.size() >= 3) {
+            // Verify the subcycle actually forms a closed loop
+            Index first_seg_idx = index(subcycle[0]);
+            Index last_seg_idx = index(subcycle[subcycle.size() - 1]);
+            bool first_ori = orientation(subcycle[0]);
+            bool last_ori = orientation(subcycle[subcycle.size() - 1]);
+            
+            auto first_seg = get_segment(first_seg_idx);
+            auto last_seg = get_segment(last_seg_idx);
+            
+            Index start_v = first_seg[first_ori ? 0 : 1];
+            Index end_v = last_seg[last_ori ? 1 : 0];
+            
+            // Only add if the loop closes (end vertex equals start vertex)
+            if (start_v == end_v) {
+                subcycles.push_back(subcycle);
+            }
+        }
+    }
+
+    return subcycles;
+}
 
 namespace {
 
@@ -301,7 +572,7 @@ Scalar get_cubic_root(Scalar val1, Scalar val2, Scalar g1, Scalar g2)
 }
 
 template <int dim>
-std::vector<Index> compute_zero_crossing_vertices(
+std::tuple<std::vector<Index>, std::vector<Index>, Index> compute_zero_crossing_vertices(
     const Contour<dim>& contour,
     std::span<const Scalar> function_values,
     std::span<const Scalar> function_gradients,
@@ -320,9 +591,6 @@ std::vector<Index> compute_zero_crossing_vertices(
     std::vector<Scalar> snap_alphas(function_values.size(), 1);
     std::vector<bool> snap_segments(num_segments, false);
     std::vector<bool> snap_ends(num_segments, false);
-
-    // Store computed vertex positions instead of adding them immediately
-    std::vector<std::array<Scalar, dim>> vertex_positions;
 
     // First pass: compute all potential vertices
     for (size_t i = 0; i < num_segments; i++) {
@@ -362,32 +630,32 @@ std::vector<Index> compute_zero_crossing_vertices(
             }
 
             // Compute the position
-            auto& position = vertex_positions.emplace_back();
+            std::array<Scalar, dim> position;
             for (int d = 0; d < dim; d++) {
                 position[d] = pos0[d] + t * (pos1[d] - pos0[d]);
             }
+            result.add_vertex(position);
 
             // Record this as the current vertex for this segment
-            zero_crossing_vertices[i] = static_cast<Index>(vertex_positions.size() - 1);
+            zero_crossing_vertices[i] = static_cast<Index>(result.get_num_vertices() - 1);
 
             // Update snapping information if needed
             if (use_snapping) {
                 snap_segments[i] = (t < snap_alpha || t > 1 - snap_alpha);
                 snap_ends[i] = (t > 1 - snap_alpha);
                 if (t < snap_alpha && t < snap_alphas[v0]) {
-                    snap_vertices[v0] = static_cast<Index>(vertex_positions.size() - 1);
+                    snap_vertices[v0] = zero_crossing_vertices[i];
                     snap_alphas[v0] = t;
                 } else if (t > 1 - snap_alpha && (1 - t) < snap_alphas[v1]) {
-                    snap_vertices[v1] = static_cast<Index>(vertex_positions.size() - 1);
+                    snap_vertices[v1] = zero_crossing_vertices[i];
                     snap_alphas[v1] = 1 - t;
                 }
             }
         }
     }
 
-    // Second pass: apply snapping and determine which vertices are actually used
-    std::vector<bool> vertex_used(vertex_positions.size(), false);
-
+    // Second pass: compute snap map.
+    ankerl::unordered_dense::map<Index, Index> snap_map;
     for (size_t i = 0; i < num_segments; i++) {
         if (zero_crossing_vertices[i] == invalid_index) {
             continue;
@@ -399,34 +667,49 @@ std::vector<Index> compute_zero_crossing_vertices(
             Index v1 = seg[1];
             if (snap_ends[i]) {
                 assert(snap_vertices[v1] != invalid_index);
-                zero_crossing_vertices[i] = snap_vertices[v1];
+                snap_map[zero_crossing_vertices[i]] = snap_vertices[v1];
             } else {
                 assert(snap_vertices[v0] != invalid_index);
-                zero_crossing_vertices[i] = snap_vertices[v0];
+                snap_map[zero_crossing_vertices[i]] = snap_vertices[v0];
             }
         }
-
-        vertex_used[zero_crossing_vertices[i]] = true;
     }
 
-    // Final pass: add only the vertices that are actually used and update indices
-    std::vector<Index> vertex_mapping(vertex_positions.size(), invalid_index);
-
-    for (size_t i = 0; i < vertex_positions.size(); i++) {
-        if (vertex_used[i]) {
-            result.add_vertex(vertex_positions[i]);
-            vertex_mapping[i] = static_cast<Index>(result.get_num_vertices() - 1);
-        }
+    // Remap vertex indices
+    const Index num_vertices = result.get_num_vertices();
+    std::vector<Index> vertex_map(num_vertices);
+    std::iota(vertex_map.begin(), vertex_map.end(), 0);
+    for (const auto& [key, value] : snap_map) {
+        vertex_map[key] = value;
     }
 
-    // Update the zero_crossing_vertices with the new indices
-    for (size_t i = 0; i < num_segments; i++) {
-        if (zero_crossing_vertices[i] != invalid_index) {
-            zero_crossing_vertices[i] = vertex_mapping[zero_crossing_vertices[i]];
-        }
+    // Sort in-place and find unique (avoids copy)
+    std::sort(vertex_map.begin(), vertex_map.end());
+    auto last = std::unique(vertex_map.begin(), vertex_map.end());
+    Index num_unique_vertices = static_cast<Index>(std::distance(vertex_map.begin(), last));
+
+    // Build compact unique_map using hash map for sparse mapping
+    ankerl::unordered_dense::map<Index, Index> unique_map;
+    unique_map.reserve(num_unique_vertices);
+    for (Index vid = 0; vid < num_unique_vertices; vid++) {
+        unique_map[vertex_map[vid]] = vid;
     }
 
-    return zero_crossing_vertices;
+    // Rebuild vertex_map with final mapping
+    std::iota(vertex_map.begin(), vertex_map.end(), 0);
+    for (const auto& [key, value] : snap_map) {
+        vertex_map[key] = value;
+    }
+    for (Index vid = 0; vid < num_vertices; vid++) {
+        Index vnew = vertex_map[vid];
+        assert(unique_map.count(vnew) > 0);
+        vertex_map[vid] = unique_map[vnew];
+    }
+
+    return std::make_tuple(
+        std::move(zero_crossing_vertices),
+        std::move(vertex_map),
+        num_unique_vertices);
 }
 
 template <int dim>
@@ -518,6 +801,111 @@ void map_cycle_regularity(
             cycle_is_regular[i]);
     }
     std::swap(cycle_is_regular, updated_cycle_is_regular);
+}
+
+template <int dim>
+Contour<dim> remap_vertices(
+    const Contour<dim>& input,
+    std::span<const Index> vertex_map,
+    Index num_snapped_vertices)
+{
+    assert(input.get_num_vertices() == vertex_map.size());
+    Index num_vertices_before_snap = input.get_num_vertices();
+
+    Contour<dim> result;
+
+    // Map vertices
+    result.resize_vertices(num_snapped_vertices);
+    for (Index vid = 0; vid < num_vertices_before_snap; vid++) {
+        Index vid_new = vertex_map[vid];
+        assert(vid_new != invalid_index);
+        assert(vid_new < num_snapped_vertices);
+        auto old_pos = input.get_vertex(vid);
+        auto new_pos = result.ref_vertex(vid_new);
+        std::copy(old_pos.begin(), old_pos.end(), new_pos.begin());
+    }
+
+    // Map segments
+    Index num_segments = input.get_num_segments();
+    std::vector<Index> segment_map(num_segments, invalid_index);
+    for (Index sid = 0; sid < num_segments; sid++) {
+        auto seg = input.get_segment(sid);
+        Index v0_new = vertex_map[seg[0]];
+        Index v1_new = vertex_map[seg[1]];
+        assert(v0_new != invalid_index && v1_new != invalid_index);
+        assert(v0_new < num_snapped_vertices && v1_new < num_snapped_vertices);
+        if (v0_new == v1_new) {
+            // degenerate segment after snapping, skip
+            continue;
+        } else {
+            result.add_segment(v0_new, v1_new);
+            segment_map[sid] = result.get_num_segments() - 1;
+        }
+    }
+
+    using SmallVector = llvm_vecsmall::SmallVector<SignedIndex, 16>;
+
+    // Create a callback to get segment endpoints
+    auto get_segment = [&](Index seg_idx) -> std::array<Index, 2> {
+        auto seg = result.get_segment(seg_idx);
+        return {seg[0], seg[1]};
+    };
+
+    // Map cycles
+    // Each original cycle may map to multiple subcycles if it contains duplicate vertices
+    Index num_cycles = input.get_num_cycles();
+    using CycleIndexList = llvm_vecsmall::SmallVector<Index, 16>;
+    std::vector<CycleIndexList> cycle_map(num_cycles);
+    for (Index cid = 0; cid < num_cycles; cid++) {
+        auto cycle = input.get_cycle(cid);
+        SmallVector new_cycle;
+        for (auto sid : cycle) {
+            Index old_sid = index(sid);
+            bool seg_ori = orientation(sid);
+            Index new_sid = segment_map[old_sid];
+            if (new_sid != invalid_index) {
+                new_cycle.push_back(signed_index(new_sid, seg_ori));
+            }
+        }
+        if (new_cycle.size() >= 3) {
+            // Extract subcycles in case the cycle contains duplicate vertices
+            auto subcycles = extract_simple_loops(
+                std::span<const SignedIndex>(new_cycle.data(), new_cycle.size()),
+                get_segment);
+            // Add all subcycles and track their indices
+            for (const auto& subcycle : subcycles) {
+                result.add_cycle(
+                    std::span<const SignedIndex>(subcycle.data(), subcycle.size()),
+                    input.is_cycle_regular(cid));
+                Index new_cid = result.get_num_cycles() - 1;
+                cycle_map[cid].push_back(new_cid);
+            }
+        }
+    }
+
+    if constexpr (dim == 4) {
+        // Map polyhedra
+        Index num_polyhedra = input.get_num_polyhedra();
+        for (Index pid = 0; pid < num_polyhedra; pid++) {
+            auto polyhedron = input.get_polyhedron(pid);
+            llvm_vecsmall::SmallVector<SignedIndex, 16> new_polyhedron;
+            for (auto cid : polyhedron) {
+                Index old_cid = index(cid);
+                bool cycle_ori = orientation(cid);
+                // Add all subcycles that the original cycle was split into
+                for (Index new_cid : cycle_map[old_cid]) {
+                    new_polyhedron.push_back(signed_index(new_cid, cycle_ori));
+                }
+            }
+            if (new_polyhedron.size() >= 4) {
+                result.add_polyhedron(
+                    std::span<const SignedIndex>(new_polyhedron.data(), new_polyhedron.size()),
+                    input.is_polyhedron_regular(pid));
+            }
+        }
+    }
+
+    return result;
 }
 
 
@@ -612,13 +1000,16 @@ Contour<3> Contour<3>::isocontour(
     assert(get_num_vertices() == function_values.size());
     Contour<3> result;
 
-    std::vector<Index> zero_crossing_vertices = compute_zero_crossing_vertices(
-        *this,
-        function_values,
-        function_gradients,
-        use_snapping,
-        result);
+    auto [zero_crossing_vertices, vertex_map, num_snapped_vertices] =
+        compute_zero_crossing_vertices(
+            *this,
+            function_values,
+            function_gradients,
+            use_snapping,
+            result);
     compute_zero_crossing_segments(*this, function_values, zero_crossing_vertices, result);
+
+    result = remap_vertices(result, vertex_map, num_snapped_vertices);
 
 #ifndef NDEBUG
     result.check_all_segments();
@@ -638,12 +1029,13 @@ Contour<4> Contour<4>::isocontour(
     assert(get_num_vertices() == function_values.size());
     Contour<4> result;
 
-    std::vector<Index> zero_crossing_vertices = compute_zero_crossing_vertices(
-        *this,
-        function_values,
-        function_gradients,
-        use_snapping,
-        result);
+    auto [zero_crossing_vertices, vertex_map, num_snapped_vertices] =
+        compute_zero_crossing_vertices(
+            *this,
+            function_values,
+            function_gradients,
+            use_snapping,
+            result);
 
     std::vector<Index> zero_crossing_segment_indices =
         compute_zero_crossing_segments(*this, function_values, zero_crossing_vertices, result);
@@ -670,6 +1062,13 @@ Contour<4> Contour<4>::isocontour(
         }
     }
 
+#ifndef NDEBUG
+    result.check_all_segments();
+    result.check_all_cycles();
+    result.check_all_polyhedra();
+#endif
+
+    result = remap_vertices(result, vertex_map, num_snapped_vertices);
 
 #ifndef NDEBUG
     result.check_all_segments();
