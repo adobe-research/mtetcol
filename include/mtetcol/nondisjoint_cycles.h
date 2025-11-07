@@ -53,7 +53,7 @@ public:
      * Each cycle is represented as a sequence of signed segment indices.
      *
      * The method uses a depth-first search to find cycles in the graph of segments. Two cycles may
-     * share vertices/segments.
+     * share vertices, but segments are not shared among cycles.
      *
      * @param[out] cycles The vector to store the signed indices of segments that form the cycles.
      *                    Each cycle is stored as a contiguous sequence of segment indices.

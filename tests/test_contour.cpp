@@ -517,6 +517,46 @@ TEST_CASE("extract_simple_loops", "[mtetcol]")
         }
     }
 
+    SECTION("Cycle with multiple loops")
+    {
+        std::vector<SignedIndex> cycle = {
+            signed_index(0, true), // segment 0: 0->1
+            signed_index(1, true), // segment 1: 1->2
+            signed_index(2, true), // segment 2: 2->3
+            signed_index(3, true), // segment 3: 3->4
+            signed_index(4, true), // segment 4: 4->7
+            signed_index(5, true), // segment 5: 7->3
+            signed_index(6, true), // segment 6: 3->6
+            signed_index(7, true), // segment 7: 6->1
+            signed_index(8, true), // segment 8: 1->5
+            signed_index(9, true)  // segment 9: 5->0
+        };
+
+        auto get_segment = [](Index seg_idx) -> std::array<Index, 2> {
+            if (seg_idx == 0) return {0, 1};
+            if (seg_idx == 1) return {1, 2};
+            if (seg_idx == 2) return {2, 3};
+            if (seg_idx == 3) return {3, 4};
+            if (seg_idx == 4) return {4, 7};
+            if (seg_idx == 5) return {7, 3};
+            if (seg_idx == 6) return {3, 6};
+            if (seg_idx == 7) return {6, 1};
+            if (seg_idx == 8) return {1, 5};
+            if (seg_idx == 9) return {5, 0};
+            return {0, 0};
+        };
+
+        auto subcycles = extract_simple_loops(cycle, get_segment);
+
+        REQUIRE(subcycles.size() == 3);
+
+        // Check that each subcycle has no duplicate vertices
+        for (const auto& subcycle : subcycles) {
+            REQUIRE(subcycle.size() >= 3);
+            REQUIRE_FALSE(has_duplicate_vertices(subcycle, get_segment));
+        }
+    }
+
     SECTION("Empty cycle")
     {
         std::vector<SignedIndex> cycle;

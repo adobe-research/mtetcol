@@ -10,7 +10,8 @@
 namespace mtetcol {
 
 template <int dim>
-bool Contour<dim>::cycle_is_simple(Index cid) const {
+bool Contour<dim>::cycle_is_simple(Index cid) const
+{
     auto cycle = this->get_cycle(cid);
     size_t cycle_size = cycle.size();
 
@@ -50,8 +51,8 @@ llvm_vecsmall::SmallVector<llvm_vecsmall::SmallVector<SignedIndex, 16>, 4> extra
         Index seg_idx = index(sid);
         bool seg_ori = orientation(sid);
         auto seg = get_segment(seg_idx);
-        Index v0 = seg[seg_ori ? 0 : 1];  // start vertex
-        Index v1 = seg[seg_ori ? 1 : 0];  // end vertex
+        Index v0 = seg[seg_ori ? 0 : 1]; // start vertex
+        Index v1 = seg[seg_ori ? 1 : 0]; // end vertex
         edge_map[{v0, v1}].push_back(sid);
     }
 
@@ -59,27 +60,27 @@ llvm_vecsmall::SmallVector<llvm_vecsmall::SmallVector<SignedIndex, 16>, 4> extra
     // Only segments connecting the same vertices in OPPOSITE directions cancel each other
     ankerl::unordered_dense::set<Index> canceled_segments;
     ankerl::unordered_dense::set<std::pair<Index, Index>> processed_edges;
-    
+
     for (const auto& [edge, sids] : edge_map) {
         auto [v0, v1] = edge;
-        
+
         // Skip if we already processed this edge pair
         if (processed_edges.count({v0, v1}) > 0 || processed_edges.count({v1, v0}) > 0) {
             continue;
         }
         processed_edges.insert({v0, v1});
-        
+
         size_t forward_count = sids.size();
         size_t reverse_count = 0;
         SmallVector reverse_sids;
-        
+
         // Check if reverse edge exists
         auto reverse_edge = std::make_pair(v1, v0);
         if (edge_map.count(reverse_edge) > 0) {
             reverse_sids = edge_map[reverse_edge];
             reverse_count = reverse_sids.size();
         }
-        
+
         // Match and cancel pairs going in opposite directions
         size_t cancel_count = std::min(forward_count, reverse_count);
         for (size_t i = 0; i < cancel_count; i++) {
@@ -88,191 +89,73 @@ llvm_vecsmall::SmallVector<llvm_vecsmall::SmallVector<SignedIndex, 16>, 4> extra
         }
     }
 
-    // Step 2: Build adjacency list for graph traversal using only non-canceled segments
-    // adj[v] contains all segments starting from vertex v
-    // The size of adj[v] gives the valence of vertex v
-    ankerl::unordered_dense::map<Index, SmallVector> adj;
+    // Step 2: Build segment array and use NonDisjointCycles for extraction
+    // Collect non-canceled segments and their vertex pairs
+    llvm_vecsmall::SmallVector<Index, 16> segment_vertices;
+    SmallVector non_canceled_sids;
+    ankerl::unordered_dense::map<Index, Index> old_to_new_index; // Map original index to new index
+
+    Index new_idx = 0;
     for (auto sid : cycle) {
         Index seg_idx = index(sid);
-        
+
         // Skip canceled segments
         if (canceled_segments.count(seg_idx) > 0) {
             continue;
         }
-        
-        bool seg_ori = orientation(sid);
+
         auto seg = get_segment(seg_idx);
-        Index v0 = seg[seg_ori ? 0 : 1];
-        adj[v0].push_back(sid);
+        segment_vertices.push_back(seg[0]);
+        segment_vertices.push_back(seg[1]);
+
+        old_to_new_index[seg_idx] = new_idx;
+        non_canceled_sids.push_back(sid);
+        new_idx++;
     }
 
-    // Check if any vertex has valence > 1 (i.e., is a junction point)
-    bool has_junction = false;
-    for (const auto& [v, segments] : adj) {
-        if (segments.size() > 1) {
-            has_junction = true;
-            break;
-        }
+    // If no non-canceled segments remain, return empty
+    if (non_canceled_sids.empty()) {
+        return {};
     }
 
-    // If no junction vertices exist, we need to extract connected components
-    // The remaining segments might form multiple disconnected simple loops
-    if (!has_junction) {
-        // Extract all connected components
-        SubcycleList subcycles;
-        ankerl::unordered_dense::set<Index> used_segments;
-        
-        for (auto sid : cycle) {
-            Index seg_idx = index(sid);
-            
-            // Skip if canceled or already used
-            if (canceled_segments.count(seg_idx) > 0 || used_segments.count(seg_idx) > 0) {
-                continue;
-            }
-            
-            // Extract one connected component starting from this segment
-            SmallVector component;
-            Index start_seg_idx = seg_idx;
-            SignedIndex current_sid = sid;
-            
-            while (true) {
-                Index curr_seg_idx = index(current_sid);
-                
-                // Check if we've already processed this segment
-                if (used_segments.count(curr_seg_idx) > 0) {
-                    break;
-                }
-                
-                component.push_back(current_sid);
-                used_segments.insert(curr_seg_idx);
-                
-                // Find the next segment in this component
-                bool curr_ori = orientation(current_sid);
-                auto curr_seg = get_segment(curr_seg_idx);
-                Index next_vertex = curr_seg[curr_ori ? 1 : 0];  // End vertex of current segment
-                
-                // Look for a segment starting from next_vertex
-                SignedIndex next_sid = current_sid;  // Initialize to current (will break if not found)
-                bool found_next = false;
-                
-                if (adj.count(next_vertex) > 0) {
-                    for (auto candidate_sid : adj[next_vertex]) {
-                        Index candidate_idx = index(candidate_sid);
-                        if (used_segments.count(candidate_idx) == 0) {
-                            next_sid = candidate_sid;
-                            found_next = true;
-                            break;
-                        }
-                    }
-                }
-                
-                if (!found_next) {
-                    // No more segments in this component
-                    break;
-                }
-                
-                current_sid = next_sid;
-            }
-            
-            // Only add components with at least 3 segments
-            if (component.size() >= 3) {
-                subcycles.push_back(component);
-            }
-        }
-        
-        return subcycles;
+    // Step 3: Use NonDisjointCycles to extract simple loops
+    NonDisjointCycles cycle_extractor(segment_vertices);
+    for (auto sid : non_canceled_sids) {
+        Index old_idx = index(sid);
+        Index mapped_idx = old_to_new_index[old_idx];
+        bool ori = orientation(sid);
+        cycle_extractor.register_segment(signed_index(mapped_idx, ori));
     }
 
-    // Track used segments by their segment index (initialized with canceled segments)
-    ankerl::unordered_dense::set<Index> used = canceled_segments;
+    std::vector<SignedIndex> extracted_cycles;
+    std::vector<Index> cycle_indices = {0}; // Initialize with 0
+    cycle_extractor.extract_cycles(extracted_cycles, cycle_indices);
 
-    // Helper lambda to extract a subcycle starting from a given segment
-    auto extract_one_subcycle = [&](SignedIndex sid) -> SmallVector {
-        Index seg_idx = index(sid);
-        bool seg_ori = orientation(sid);
-        auto seg = get_segment(seg_idx);
-        Index start_vertex = seg[seg_ori ? 0 : 1];
-        Index current_vertex = seg[seg_ori ? 1 : 0];
+    // Step 4: Build reverse mapping for efficiency
+    ankerl::unordered_dense::map<Index, Index> new_to_old_index;
+    for (const auto& [old_idx, new_idx] : old_to_new_index) {
+        new_to_old_index[new_idx] = old_idx;
+    }
+
+    // Convert the extracted cycles back to original indices
+    SubcycleList subcycles;
+    for (size_t i = 0; i < cycle_indices.size() - 1; i++) {
+        Index start = cycle_indices[i];
+        Index end = cycle_indices[i + 1];
 
         SmallVector subcycle;
-        subcycle.push_back(sid);
-        used.insert(seg_idx);
+        for (Index j = start; j < end; j++) {
+            // Map back to original segment index
+            Index mapped_idx = index(extracted_cycles[j]);
+            bool ori = orientation(extracted_cycles[j]);
+            Index original_idx = new_to_old_index[mapped_idx];
 
-        // Follow the chain until we return to start or reach a dead end
-        while (current_vertex != start_vertex) {
-            bool found_next = false;
-            if (adj.count(current_vertex) > 0) {
-                for (auto next_sid : adj[current_vertex]) {
-                    Index next_seg_idx = index(next_sid);
-
-                    // Skip if this segment has already been used
-                    if (used.count(next_seg_idx) > 0) {
-                        continue;
-                    }
-
-                    bool next_seg_ori = orientation(next_sid);
-                    auto next_seg = get_segment(next_seg_idx);
-                    Index next_v0 = next_seg[next_seg_ori ? 0 : 1];
-
-                    if (next_v0 == current_vertex) {
-                        subcycle.push_back(next_sid);
-                        used.insert(next_seg_idx);
-                        current_vertex = next_seg[next_seg_ori ? 1 : 0];
-                        found_next = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!found_next) {
-                // Dead end - this shouldn't happen in a valid cycle
-                break;
-            }
+            subcycle.push_back(signed_index(original_idx, ori));
         }
 
-        return subcycle;
-    };
-
-    // Extract subcycles by starting from segments whose starting vertex has valence > 1
-    // (junction points) This ensures we properly split cycles at duplicate vertices
-    SubcycleList subcycles;
-
-    for (auto sid : cycle) {
-        Index seg_idx = index(sid);
-
-        if (used.count(seg_idx) > 0) {
-            continue;
-        }
-
-        bool seg_ori = orientation(sid);
-        auto seg = get_segment(seg_idx);
-        Index start_vertex = seg[seg_ori ? 0 : 1];
-
-        // Only process segments starting from junction vertices (valence > 1)
-        if (adj[start_vertex].size() <= 1) {
-            continue;
-        }
-
-        auto subcycle = extract_one_subcycle(sid);
-
-        // Only add subcycle if it forms a valid closed loop (at least 3 segments and actually closes)
+        // Only include cycles with at least 3 segments
         if (subcycle.size() >= 3) {
-            // Verify the subcycle actually forms a closed loop
-            Index first_seg_idx = index(subcycle[0]);
-            Index last_seg_idx = index(subcycle[subcycle.size() - 1]);
-            bool first_ori = orientation(subcycle[0]);
-            bool last_ori = orientation(subcycle[subcycle.size() - 1]);
-            
-            auto first_seg = get_segment(first_seg_idx);
-            auto last_seg = get_segment(last_seg_idx);
-            
-            Index start_v = first_seg[first_ori ? 0 : 1];
-            Index end_v = last_seg[last_ori ? 1 : 0];
-            
-            // Only add if the loop closes (end vertex equals start vertex)
-            if (start_v == end_v) {
-                subcycles.push_back(subcycle);
-            }
+            subcycles.push_back(subcycle);
         }
     }
 
