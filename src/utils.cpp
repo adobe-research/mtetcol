@@ -13,6 +13,41 @@
 
 namespace mtetcol {
 
+bool tet_mesh_is_manifold(std::span<Index> tets)
+{
+    assert(tets.size() % 4 == 0);
+    size_t num_tets = tets.size() / 4;
+    TriangleMap triangle_count;
+
+    for (size_t i = 0; i < num_tets; i++) {
+        auto tet = tets.subspan(i * 4, 4);
+        // List all 4 faces of the tetrahedron
+        std::array<std::array<Index, 3>, 4> faces = {{
+            {tet[0], tet[2], tet[1]},
+            {tet[1], tet[2], tet[3]},
+            {tet[0], tet[1], tet[3]},
+            {tet[0], tet[3], tet[2]}
+        }};
+        for (const auto& face : faces) {
+            auto [it, _] = triangle_count.try_emplace(face, 0);
+            it->second += 1;
+        }
+    }
+
+    for (auto [triangle, count] : triangle_count) {
+        if (count > 2) {
+            logger().error(
+                "Non-manifold triangle found: [{}, {}, {}] appears {} times",
+                triangle[0],
+                triangle[1],
+                triangle[2],
+                count);
+            return false;
+        }
+    }
+    return true;
+}
+
 void extract_vertex_zero_crossing(
     std::span<const Scalar> time_samples,
     std::span<const Scalar> function_values,

@@ -17,6 +17,9 @@ void SimplicialColumn<4>::set_simplices(std::span<Index> simplices)
 {
     assert(simplices.size() % 4 == 0);
     logger().info("Set simplices with {} tets", simplices.size() / 4);
+    if (!tet_mesh_is_manifold(simplices)) {
+        throw std::invalid_argument("Input tetrahedral mesh is not manifold");
+    }
 
     EdgeMap edges;
     TriangleMap triangles;

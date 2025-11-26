@@ -336,6 +336,56 @@ public:
         std::span<Scalar> function_gradients = {},
         bool use_snapping = false) const;
 
+public:
+    /**
+     * @brief Check if the contour is manifold.
+     *
+     * @note This check is designed for 4D contours composed of polyhedra.
+     *
+     * A contour is manifold if no cycle is shared by more than two polyhedra.
+     *
+     * @return bool True if the contour is manifold, false otherwise.
+     */
+    bool is_manifold() const
+    {
+        size_t num_cycles = get_num_cycles();
+        size_t num_polyhedra = get_num_polyhedra();
+
+        if (num_polyhedra > 0) {
+            std::vector<size_t> cycle_usage_count(num_cycles, 0);
+            for (size_t pi = 0; pi < num_polyhedra; pi++) {
+                auto poly = get_polyhedron(pi);
+                for (auto ci : poly) {
+                    Index cycle_id = index(ci);
+                    cycle_usage_count[cycle_id]++;
+                }
+            }
+            for (auto count : cycle_usage_count) {
+                if (count > 2) {
+                    return false;
+                }
+            }
+        } else if (num_cycles > 0) {
+            size_t num_segments = get_num_segments();
+            std::vector<size_t> segment_usage_count(num_segments, 0);
+            for (size_t ci = 0; ci < num_cycles; ci++) {
+                auto cycle = get_cycle(ci);
+                for (auto si : cycle) {
+                    Index seg_id = index(si);
+                    segment_usage_count[seg_id]++;
+                }
+            }
+            for (auto count : segment_usage_count) {
+                if (count > 2) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+
 private:
     void check_all_segments() const
     {
@@ -453,6 +503,7 @@ private:
         for (size_t pi = 0; pi < num_polyhedra; pi++) {
             check_polyhedron(pi);
         }
+        assert(is_manifold());
     }
 
 

@@ -464,4 +464,33 @@ TEST_CASE("simplicial_column", "[mtetcol]")
 
         check_overlapped_rotation<3>(columns);
     }
+
+    SECTION("Non-manifold mesh: triangle shared by 3 tets")
+    {
+        // clang-format off
+        // Create a configuration where 3 tetrahedra share the same triangle [0, 1, 2]
+        // This is non-manifold and should throw an exception
+        Scalar vertices[] = {
+            0, 0, 0,    // vertex 0
+            1, 0, 0,    // vertex 1
+            0, 1, 0,    // vertex 2
+            0, 0, 1,    // vertex 3
+            0, 0, -1,   // vertex 4
+            0.5, 0.5, 2 // vertex 5
+        };
+        Index tets[] = {
+            0, 1, 2, 3,  // first tet with triangle [0, 2, 1]
+            0, 2, 1, 4,  // second tet with triangle [0, 1, 2] (same as above but reversed)
+            0, 1, 2, 5,  // third tet with triangle [0, 2, 1] (same orientation as first)
+        };
+        // clang-format on
+
+        mtetcol::SimplicialColumn<4> columns;
+        columns.set_vertices(std::span<Scalar>(vertices, sizeof(vertices) / sizeof(Scalar)));
+
+        // This should throw an exception because triangle [0, 2, 1] appears 3 times
+        REQUIRE_THROWS_AS(
+            columns.set_simplices(std::span<Index>(tets, sizeof(tets) / sizeof(Index))),
+            std::invalid_argument);
+    }
 }

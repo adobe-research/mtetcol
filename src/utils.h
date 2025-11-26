@@ -11,6 +11,18 @@
 namespace mtetcol {
 
 /**
+ * @brief Checks if a tetrahedral mesh is manifold.
+ *
+ * A tetrahedral mesh is manifold if no triangle is shared by more than two tetrahedra.
+ *
+ * @param tets A span of tetrahedral indices, where each tetrahedron is represented by 4 vertex
+ * indices.
+ *
+ * @return True if the mesh is manifold, false otherwise.
+ */
+bool tet_mesh_is_manifold(std::span<Index> tets);
+
+/**
  * @brief Checks if the spatial edges of a simplicial column are valid.
  *
  * The spatial edges are valid if their end vertices are in ascending order and

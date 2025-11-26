@@ -134,6 +134,7 @@ TEST_CASE("contour", "[mtetcol]")
         REQUIRE(contour.get_num_segments() == 12);
         REQUIRE(contour.get_num_cycles() == 6);
         REQUIRE(contour.get_num_polyhedra() == 1);
+        REQUIRE(contour.is_manifold());
 
         contour.triangulate_cycles();
 
@@ -141,6 +142,7 @@ TEST_CASE("contour", "[mtetcol]")
         REQUIRE(contour.get_num_segments() == 18);
         REQUIRE(contour.get_num_cycles() == 12);
         REQUIRE(contour.get_num_polyhedra() == 1);
+        REQUIRE(contour.is_manifold());
 
         SECTION("Isocontour: single corner")
         {
